@@ -28,10 +28,9 @@ class Hand:
     def to_true_string(self):
         if not self.hand:
             return ""
-        original = self.hand[0].visible
         self.hand[0].visible = True
+        self.hand[1].visible = True
         s = " ".join(card.get_name() for card in self.hand)
-        self.hand[0].visible = original
         return s
 
     def add_card(self, card):

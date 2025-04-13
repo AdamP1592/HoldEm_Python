@@ -16,14 +16,17 @@ class Player:
 
     def check(self):
         if not self.folded:
+            self.raised = False
             self.checked = True
             return True
         return False
 
     def raise_(self, raise_amount):
-        self.checked = False
+        
         if not self.folded and (raise_amount <= (self.total_money - self.total_bet)):
             self.raised = True
+            self.checked = False
+
             self.raise_amount = raise_amount
             self.total_bet += raise_amount
             return True
@@ -45,8 +48,9 @@ class Player:
         self.raised = False
 
     def reset(self):
+        cards_in_hand = [card for card in self.hand.get_hand()] # shallow copy, but not just reference to list
         self.next_turn()
         self.folded = False
         self.total_bet = 0
         self.hand = None
-        return self.hand
+        return cards_in_hand

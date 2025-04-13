@@ -19,6 +19,9 @@ class Card:
             return self.card_name
         else:
             return "**"
+        
+    def get_true_name(self):
+        return self.card_name
 
     def __str__(self):
         return f"{self.get_name()} of {self.suit}"

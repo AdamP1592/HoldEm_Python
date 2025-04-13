@@ -14,15 +14,15 @@ class Deck:
     def setup_decks(self):
         self.cards.clear()
         face_cards = [10, 11, 12]
-        face_card_names = ["J", "K", "Q"]
+        face_card_names = ["J", "Q", "K"]
         for _ in range(self.num_decks):
             for suit_index in range(len(self.suits)):
                 for j in range(13):
                     idx = self.index_of(face_cards, j)
                     if j == 0:
-                        card = Card(1, "A" + self.suit_chars[suit_index], self.suits[suit_index], high_value=10)
+                        card = Card(1, "A" + self.suit_chars[suit_index], self.suits[suit_index], high_value=14)
                     elif idx != -1:
-                        card = Card(j, face_card_names[idx] + self.suit_chars[suit_index], self.suits[suit_index])
+                        card = Card(j + 1, face_card_names[idx] + self.suit_chars[suit_index], self.suits[suit_index])
                     else:
                         card = Card(j + 1, str(j + 1) + self.suit_chars[suit_index], self.suits[suit_index])
                     self.cards.append(card)

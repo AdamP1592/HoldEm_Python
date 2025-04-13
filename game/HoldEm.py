@@ -14,17 +14,6 @@ class HoldEm:
         self.community_cards = [None] * 5
         self.community_cards_index = 0
 
-        self.hands = ["Royal Straight Flush",
-                      "Straight Flush",
-                      "4 of a kind",
-                      "Full House",
-                      "Flush",
-                      "Straight",
-                      "Three of a kind",
-                      "Two Pair",
-                      "Pair",
-                      "High Card"]
-
     def river(self):
         c = self.deck.deal_card()
         c.visible = True
@@ -37,31 +26,16 @@ class HoldEm:
         self.community_cards[3] = c
         self.community_cards_index += 1
 
- 
-            
+    def rank_hands(self):
+        from game import HandRanker
+        handValues = {}
 
-
-    def rank_hands(self, hand:Hand):
-        """
-            Ranks: royal straight flush
-            straight flush(with highest total card value)
-            4 of a kind
-            full house
-            flush
-            straight
-            3 of a kind
-            2 pair
-            pair
-            high card
+        for playerKey in self.players.keys():
+            if not self.players[playerKey].folded:
+                player_hand = self.players[playerKey].get_hand()
+                handValues[playerKey] = HandRanker.get_best_hand_value(player_hand, self.community_cards)
         
-        """
-        cards = hand.get_hand()
-
-    def finish_round(self):
-        hands = {}
-        for player_key in self.players.keys():
-            if not self.players[player_key].folded:
-                hands[player_key] = self.players.get_hand()
+        return handValues
 
     def flop(self):
         for i in range(3):
@@ -72,10 +46,6 @@ class HoldEm:
 
     def get_community_cards(self):
         comm_cards = self.community_cards[:self.community_cards_index + 1]
-        for card in comm_cards:
-            if(card != None):
-                print(card.get_name(), end=" ")
-        print()
         return comm_cards
 
     def remove_player(self, player_id):
@@ -104,10 +74,56 @@ class HoldEm:
 
     def print_hands(self):
         for player in self.players.values():
-            print(str(player.hand))
+            
+            print(str(player.hand.to_true_string()))
     
     def reset(self):
         #return each players hand to the deck
+        possible_ranks = ["Royal Straight Flush",
+                      "Straight Flush",
+                      "4 of a kind",
+                      "Full House",
+                      "Flush",
+                      "Straight",
+                      "Three of a kind",
+                      "Two Pair",
+                      "Pair",
+                      "High Card"]
+        
+        player_ranks = []
+
+        hand_ranks = self.rank_hands()
+
+        for key in self.players.keys():
+            hand_category = hand_ranks[key][0]
+            hand_category_value = hand_ranks[key][1]
+            hand_category_rank = possible_ranks.index(hand_category)
+            player_ranks.append((key, hand_category_rank, hand_category_value))
+
+        sorted_ranks = sorted(player_ranks, key=lambda x: x[1])
+
+        for rank in sorted_ranks:
+            print(self.players[rank[0]].get_hand().to_true_string())
+            print(rank)
+            print(possible_ranks[rank[1]])
+
+        top_rank = sorted_ranks[0][1] # gets best hand rank
+        top_ranks = []
+        
+        for hand_rank in sorted_ranks:# adds all hand ranks that match
+            if top_rank != hand_rank[1]:
+                break
+            top_ranks.append(hand_rank)
+
+        
+        
+        """for rank in top_ranks:
+            print(self.players[rank[0]].get_hand().to_true_string())
+        """
+            
+
+  
+        #return each card from hands
         for key in self.players.keys():
             cards = self.players[key].reset()
             for card in cards:
@@ -116,6 +132,7 @@ class HoldEm:
         #return each card from community cards
         for cardInd in range(len(self.community_cards)):
             self.deck.return_card(self.community_cards[cardInd])
-        self.community_cards.clear()
+        self.community_cards= [None] * 5
+        self.community_cards_index = 0
 
         self.deck.shuffle()
