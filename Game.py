@@ -8,20 +8,20 @@ def buildTable(numPlayers:int):
     global table
     global players
     for i in range(numPlayers):
-        players += table.add_player()
-    
-    
+        players.append(table.add_player())
 
 if __name__ == "__main__":
     buildTable(5)
-    d = Deck(1)
-    cards = d.cards
-    for card in cards:
-        card.visible = True
-        print(card.get_true_name(), " ", card.get_value(True))
-
+    raise_amount = 5
+    for player in players:
+        player.raise_(raise_amount)
+        raise_amount += 1
     for i in range(1):
         table.game.deal_hands()
+
+        base_hand = players[0].get_hand()
+        for player in players:
+            player.set_hand(base_hand)
 
         table.advance_stage()
         table.game.get_community_cards()
@@ -35,9 +35,11 @@ if __name__ == "__main__":
         for card in cards:
             print(card.get_true_name(), end = " ")
         print()
-        
-
         table.advance_stage()
+
+                
+        for player in players:
+            print(player.total_money)
     
     
     #table.game.rank_hands()

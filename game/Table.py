@@ -16,7 +16,7 @@ class Table:
         player_id = str(random.getrandbits(128))
         p = Player()
         self.players[player_id] = p
-        return player_id
+        return p
     
     def remove_player(self, player_key):
         self.players.pop(player_key)
