@@ -7,6 +7,8 @@ class Table:
     def __init__(self):
         self.game = HoldEm(1)
         self.stages = {"pre-flop":self.game.flop, "flop": self.game.turn, "turn": self.game.river, "river": self.game.reset }
+
+        self.hand_done = False
         self.current_stage = "pre-flop"
 
         self.players = {}
@@ -15,6 +17,12 @@ class Table:
         self.pot = self.game.pot # shared instance
 
         self.current_raise = 0
+
+    def has_a_player_raised(self):
+        for player_key in self.players:
+            if self.players[player_key].raised:
+                return True
+        return False
 
     def add_player(self):
         player_id = str(random.getrandbits(128))

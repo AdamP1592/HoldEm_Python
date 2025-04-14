@@ -1,6 +1,6 @@
 from game.Table import Table
+from dqn import *
 
-from dqn.dqn import simple_dqn
 table = Table()
 players = []
 
@@ -46,6 +46,7 @@ def print_comm_cards():
     print()
 def is_legal_action():
     pass
+
 if __name__ == "__main__":
     num_players = 8
     num_state_variables = 20
@@ -58,13 +59,12 @@ if __name__ == "__main__":
 
     buildTable(num_players)
 
-    raise_amount = 5
-
-    first_action = False
-    while table.current_raise != 0 and not first_action:
+    first_action = True
+    memory_buffers = [ReplayBuffer(5000) for _ in range(num_players)]
+    while table.has_a_player_raised() or first_action:
         
+        first_action = False
         for player_ind in range(len(player_networks)):
-
             player_network = player_networks[player_ind]
             player = players[player_ind]
 
@@ -80,8 +80,17 @@ if __name__ == "__main__":
                     max_index = val_index
                     current_max = new_max
             
+            
             action(player, max_index)
 
+            next_state = table.get_state()
+
+            memory = Memory(state, max_index, 0, next_state, table.hand_done)
+            memory_buffers[player_ind] = memory
+
+        for memory_buffer in memory_buffers:
+            memory_buffer.buffer[-1].is_done = True          
+            # assign rewards
     #on completion, apply a retroactive reward modifier if the player won money
     #if the player lost money apply a negative reward modifier
     #if the player didn't lose or win anything apply a small negative modifier

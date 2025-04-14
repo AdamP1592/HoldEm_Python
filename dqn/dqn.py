@@ -1,5 +1,5 @@
 import tensorflow as tf
-class dqn():
+class DQN():
     def __init__(self, network_structure):
         output_layer = tf.keras.layers.Dense(network_structure[len(network_structure) - 1])
         del network_structure[-1]
@@ -68,7 +68,7 @@ class dqn():
         self.target_model = tf.keras.models.clone_model(self.model)
         self.target_model.set_weights(self.model.get_weights())
 
-class simple_dqn(dqn):
+class simple_dqn(DQN):
     def __init__(self, num_input, num_outputs):
         structure = [num_input, 64, 64, 32, 32, 16, 16, num_outputs, num_outputs, num_outputs]
         super.__init__(structure)
