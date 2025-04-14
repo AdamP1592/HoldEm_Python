@@ -10,7 +10,11 @@ class Table:
         self.current_stage = "pre-flop"
 
         self.players = {}
-        self.game.players = self.players
+        self.game.players = self.players # shared instance
+        self.community_cards = self.game.community_cards #shared instance
+        self.pot = self.game.pot # shared instance
+
+        self.current_raise = 0
 
     def add_player(self):
         player_id = str(random.getrandbits(128))

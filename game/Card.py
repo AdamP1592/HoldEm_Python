@@ -5,6 +5,7 @@ class Card:
         self.card_value = card_value
         self.high_value = high_value
         self.suit = suit
+        self.id = None
 
     def get_value(self, is_high=False):
         if self.visible:

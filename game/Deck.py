@@ -18,6 +18,9 @@ class Deck:
         for _ in range(self.num_decks):
             for suit_index in range(len(self.suits)):
                 for j in range(13):
+                    card_id = suit_index * 13 + j  # unique card index from 0 to 51
+                    normalized_id = card_id / 51.0 
+
                     idx = self.index_of(face_cards, j)
                     if j == 0:
                         card = Card(1, "A" + self.suit_chars[suit_index], self.suits[suit_index], high_value=14)
@@ -25,6 +28,8 @@ class Deck:
                         card = Card(j + 1, face_card_names[idx] + self.suit_chars[suit_index], self.suits[suit_index])
                     else:
                         card = Card(j + 1, str(j + 1) + self.suit_chars[suit_index], self.suits[suit_index])
+
+                    card.id = normalized_id
                     self.cards.append(card)
 
     def size_(self):

@@ -1,8 +1,34 @@
 from game.Table import Table
 
-from game.Deck import Deck
+from dqn.dqn import simple_dqn
 table = Table()
 players = []
+
+#state enconding: (5000 is the base amount of money for each player)
+# player position: (player index / num players)
+# player money: (current_money/ 5000)
+# call amount (pot - [sum(every other players bet) or blind amount]
+# cards in hand (2)
+# community cards (5)
+# whether or not each other player has raised this round (8)
+# number of active players(numActive/totalPlayers) (8)
+# betting round
+
+def action(player, action:int):
+    #action = some int between 0 and 9
+
+    raise_sizes = [0.05, 0.1, 0.2, 0.4, 0.5, 0.75, 1.0]
+    raise_amounts = [raise_size * player.total_money for raise_size in raise_sizes]
+
+    match action:
+        case 9:
+            player.fold()
+        case 8:
+            player.check()
+        case 7: 
+            player.call(table.current_raise)
+        case _:
+            player._raise(raise_amounts[action])
 
 def buildTable(numPlayers:int):
     global table
@@ -10,31 +36,72 @@ def buildTable(numPlayers:int):
     for i in range(numPlayers):
         players.append(table.add_player())
 
+def print_comm_cards():
+    cards = table.game.community_cards
+    for card in cards:
+        if card == None:
+            print("None", end = " ")
+        else:
+            print(card.get_true_name(), end = " ")
+    print()
+def is_legal_action():
+    pass
 if __name__ == "__main__":
-    buildTable(5)
+    num_players = 8
+    num_state_variables = 20
+    num_outputs = 10
+
+    player_networks = []
+    for _ in range(num_players):
+        network = simple_dqn(num_state_variables, num_outputs)
+        player_networks.append(network)
+
+    buildTable(num_players)
+
     raise_amount = 5
+
+    first_action = False
+    while table.current_raise != 0 and not first_action:
+        
+        for player_ind in range(len(player_networks)):
+
+            player_network = player_networks[player_ind]
+            player = players[player_ind]
+
+            state = table.get_state()
+
+            q_values = player_network.get_model_output(state)
+            current_max = q_values[0]
+
+            max_index = 0
+            for val_index in range(len(q_values)):
+                new_max = max(current_max, q_values[val_index])
+                if new_max != current_max:
+                    max_index = val_index
+                    current_max = new_max
+            
+            action(player, max_index)
+
+    #on completion, apply a retroactive reward modifier if the player won money
+    #if the player lost money apply a negative reward modifier
+    #if the player didn't lose or win anything apply a small negative modifier
+
     for player in players:
         player.raise_(raise_amount)
         raise_amount += 1
-    for i in range(1):
+    for i in range(2):
         table.game.deal_hands()
+        table.advance_stage()
+        table.game.get_community_cards()
 
-        base_hand = players[0].get_hand()
-        for player in players:
-            player.set_hand(base_hand)
-
+        print_comm_cards()
         table.advance_stage()
         table.game.get_community_cards()
         table.advance_stage()
-        table.game.get_community_cards()
-        table.advance_stage()
-        cards = table.game.get_community_cards()
 
         table.game.print_hands()
 
-        for card in cards:
-            print(card.get_true_name(), end = " ")
-        print()
+
         table.advance_stage()
 
                 
