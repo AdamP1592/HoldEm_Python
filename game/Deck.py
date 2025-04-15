@@ -41,12 +41,13 @@ class Deck:
     def deal_card(self):
         if not self.cards:
             raise Exception("No cards left in the deck.")
-        card = self.cards.pop(0)
+        card = self.cards.pop()
         self.size -= 1
         return card
 
     def return_card(self, card):
         self.cards.append(card)
+        self.size+=1
 
     def index_of(self, ls, val):
         for i, item in enumerate(ls):

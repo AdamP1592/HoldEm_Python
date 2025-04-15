@@ -64,8 +64,7 @@ class HoldEm:
         self.players[player_id] = player
 
     def deal_hands(self):
-        num_players = len(self.players)
-        self.pot = [0] * num_players
+        self.pot = 0
         for player in self.players.values():
             card1 = self.deck.deal_card()
             card1.visible = False
@@ -85,11 +84,6 @@ class HoldEm:
             
             print(str(player.hand.to_true_string()))
 
-    def split_pot(self, player_keys, pot):
-        each_player_value = pot/len(player_keys)
-        for player_key in player_keys:
-            self.players[player_keys] += each_player_value
-    
     def reset(self):
         print(self.pot)
         #return each players hand to the deck

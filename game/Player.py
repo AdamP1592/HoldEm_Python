@@ -8,6 +8,7 @@ class Player:
         self.total_bet = 0
         self.total_money = 5000
 
+    
 
     def set_hand(self, h):
         self.hand = h
@@ -39,6 +40,7 @@ class Player:
     def call(self, amount):
         if not self.folded and (amount <= (self.total_money - self.total_bet)):
             self.checked = True
+            self.raised = False
             self.total_bet += amount
             return True
         return False
