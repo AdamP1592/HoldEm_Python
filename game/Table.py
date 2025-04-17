@@ -24,6 +24,13 @@ class Table:
 
         self.current_raise = 50
 
+    def update_pot(self):
+        self.pot = 0
+        for player_key in self.players:
+            player = self.players[player_key]
+            self.pot += player.total_bet
+            self.current_raise = max(self.current_raise, player.raise_amount)
+
     def get_starting_player(self):
         player_keys = list(self.players.keys())
         for key_ind in range(len(player_keys)):
@@ -65,6 +72,9 @@ class Table:
                 return True
         return False
 
+    def deal(self):
+        self.game.deal_hands()
+
     def add_player(self):
         player_id = str(random.getrandbits(128))
 
@@ -81,10 +91,12 @@ class Table:
         self.players.pop(player_key)
 
     def advance_stage(self):
+        
         if self.has_a_player_raised():
             return
         self.stages[self.current_stage]()
 
+        self.current_raise = 0
         stageKeys = list(self.stages.keys())
         ind = stageKeys.index(self.current_stage)
 
