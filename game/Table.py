@@ -23,6 +23,80 @@ class Table:
         self.small_blind = 25
 
         self.current_raise = 50
+    
+    def get_state(self, player_key):
+
+        base_money = 5000
+        num_players = len(self.players)
+
+        player_keys = list(self.players.keys())
+        starting_player_key = self.get_starting_player()
+        starting_player_ind = player_keys.index(starting_player_key)
+
+        state = [       
+                 starting_player_ind/num_players,
+                 self.players[player_key].total_money/base_money,
+                 self.pot/base_money,
+                 self.current_raise/base_money
+
+                ]
+        
+
+        #encodes stage
+        stage_names = list(self.stages.keys())
+        current_stage_ind = stage_names.index(self.current_stage)
+        for stage in self.stages.keys():
+            if stage == current_stage_ind:
+                state.append(1.0)
+            else:
+                state.append(0)
+
+        
+
+
+        #grabs whether or not each player has folded, their total bet, and their current raise
+        for key in self.players:
+            player = self.players[key]
+            if player.folded:
+                state.append(0)
+            else:
+                state.append(1)
+
+            state.append(player.total_bet/base_money)
+            state.append(player.raise_amount/base_money)
+        
+        #encodes player cards in one-hot style encoding
+        hole_map = [0] * 52
+        cards_in_hand = self.players[player_key].get_hand().get_cards()
+        for card in cards_in_hand:
+            idx = card.get_encoded_value()
+            hole_map[idx] = 1
+
+        state.extend(hole_map)
+
+        #encodes community cards in one‑hot 
+        board_map = [0] * 52
+        for card in self.community_cards:
+            if card != None:
+                idx = card.get_encoded_value()
+                board_map[idx] = 1
+
+        state.extend(board_map)
+
+        
+
+        return state
+
+    #state enconding: (5000 is the base amount of money for each player)
+    # player position: (player index / num players)
+    # player money: (current_money/ 5000)
+    # call amount (pot - [sum(every other players bet) or blind amount]
+    # cards in hand (2)
+    # community cards (5)
+    # whether or not each other player has raised this round (8)
+    # active players
+    # betting round
+
 
     def update_pot(self):
         self.pot = 0
@@ -31,7 +105,7 @@ class Table:
             self.pot += player.total_bet
             self.current_raise = max(self.current_raise, player.raise_amount)
 
-    def get_starting_player(self):
+    def get_starting_player(self) -> int:
         player_keys = list(self.players.keys())
         for key_ind in range(len(player_keys)):
             if player_keys[key_ind] == self.big_blind_key:

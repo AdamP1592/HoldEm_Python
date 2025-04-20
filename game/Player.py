@@ -72,7 +72,7 @@ class Player:
         self.raised = False
 
     def reset(self):
-        cards_in_hand = [card for card in self.hand.get_hand()] # shallow copy, but not just reference to list
+        cards_in_hand = [card for card in self.hand.get_cards()] # shallow copy, but not just reference to list
         self.next_turn()
         self.folded = False
         self.total_bet = 0

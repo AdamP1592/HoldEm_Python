@@ -102,7 +102,7 @@ def check_for_straight(cards):
     return None, 0
 
 def get_best_hand_value(hand, community_cards):
-    total_cards = hand.get_hand() + community_cards
+    total_cards = hand.get_cards() + community_cards
 
 
     # Group cards by suit.

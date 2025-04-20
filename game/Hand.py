@@ -19,7 +19,7 @@ class Hand:
             value_sum = -1
         return value_sum
 
-    def get_hand(self):
+    def get_cards(self):
         return self.hand
 
     def __str__(self):

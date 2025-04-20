@@ -71,4 +71,4 @@ class DQN():
 class simple_dqn(DQN):
     def __init__(self, num_input, num_outputs):
         structure = [num_input, 64, 64, 32, 32, 16, 16, num_outputs, num_outputs, num_outputs]
-        super.__init__(structure)
+        super().__init__(structure)

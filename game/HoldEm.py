@@ -93,7 +93,7 @@ class HoldEm:
         for player_key in self.players:
             if not self.players[player_key].folded:
                 player_hand = self.players[player_key].get_hand()
-                player_hands[player_key] = player_hand.get_hand()
+                player_hands[player_key] = player_hand.get_cards()
 
         hand_ranks = rank_players(self.community_cards, player_hands)
         for ranked_player_list in hand_ranks:

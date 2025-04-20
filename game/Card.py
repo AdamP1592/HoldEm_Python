@@ -6,6 +6,19 @@ class Card:
         self.high_value = high_value
         self.suit = suit
         self.id = None
+        self.set_encoded_value()
+
+
+    def set_encoded_value(self):
+        suits = ["spade", "heart", "diamond", "club"]
+        suit_ind = suits.index(self.suit)
+        encoded_suit = suit_ind * 13
+        encoded_card = encoded_suit + self.card_value
+        self.normalized_encoded_val = encoded_card
+
+    def get_encoded_value(self):
+        return self.normalized_encoded_val
+
 
     def get_value(self, is_high=False):
         if self.visible:
