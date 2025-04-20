@@ -1,6 +1,6 @@
 from game.Table import Table
 from queue import Queue
-#from dqn import *
+from dqn import simple_dqn
 
 table = Table()
 players = []
@@ -55,8 +55,10 @@ def is_legal_action(action_index, player_key):
             if player.folded:
                 return False # cant fold if the player has already folded
         case 8:
-            if player.folded or table.current_raise != player.raise_amount:
+            if player.folded:
                 return False # cant check if the player has folded
+            if table.current_raise != player.raise_amount and player.total_money != 0:
+                return False # if a player hasn't gone all in and they haven't matched the raise
             
         case 7:
             if table.current_raise == 0 or player.folded or player.total_bet == table.current_raise:
@@ -69,7 +71,7 @@ def is_legal_action(action_index, player_key):
     return True
 
 def debug_valid_action_info(player_key, action_index):
-    player = players[player_key]
+    player = table.players[player_key]
     print("=== ILLEGAL ACTION DEBUG ===")
     print(f"Player Key:        {player_key}")
     print(f"Action Index:      {action_index}")
@@ -94,88 +96,92 @@ def debug_valid_action_info(player_key, action_index):
         print(f"Computed raise_amt:   {computed}")
     print("============================")
 
-def test_game():
-    global players
+def hand_loop():
     num_players = 4
     buildTable(num_players)
-    players = table.players
 
+    table.apply_blind()
+    table.update_pot()
+    table.deal()
 
-    starting_player_key = None
+    player_key_list = list(table.players.keys())
+    starting_player_key = table.get_starting_player()
 
-    pre_flop = True
+    round_end_ind = player_key_list.index(starting_player_key)
 
-    while table.current_stage != "pre-flop" or pre_flop: # while hand isnt done
-        if pre_flop:
-            table.apply_blind()
-            starting_player_key = table.get_starting_player()
-            table.update_pot()
-            table.deal()
+    pre_flop = True # to ensure the current hand is the inital pre-flop
+    while table.current_stage != "pre-flop" or pre_flop:
         pre_flop = False
+        
+        i = 0
+        #iterate over the length of the players.
+        #if a player raises, shift round_end_ind to the current index and then
+        #reset i to 0
+        while i < num_players:
+            current_player_index = (round_end_ind + i) % num_players
+            current_player_key = player_key_list[current_player_index]
+            current_player = table.players[current_player_key]
+            #skip player if he has folded
+            if current_player.folded:
+                i+=1
+                continue
 
-        first_action = True
-
-        while table.has_a_player_raised() or first_action:#loop until no player has raised
-            #catch case for if all players have folded
+            #check if there is only one active player they win
+            active_players = [p_key for p_key, p in table.players.items() if not p.folded]
+            if len(active_players) == 1:
+                table.player_won(active_players[0])
+                table.reset_hand()
+                return  # or return, if in function
+            
+            print("Current Pot: ", table.pot)
+            print("Current Raise Amount", table.current_raise)
+            print("Player: ", current_player_index)
 
             table.print_comm_cards()
-            
-            first_action = False
 
-            player_keys = list(players.keys())
-            starting_index = player_keys.index(starting_player_key)
-            index = starting_index
-            for i in range(len(player_keys)):
-                print("Current Pot: ", table.pot)
-                print("Current Raise Amount", table.current_raise)
-                print("Player: ", i)
-
-                active_players = [p_key for p_key, p in players.items() if not p.folded]
-
-
-                if len(active_players) == 1:
-                    table.player_won(active_players[0])
-                    table.reset_hand()
-                    return  # or return, if in function
-                
-                index = (starting_index + i) % len(player_keys)
-
-                for player_ind in range(len(player_keys)):
-                    player_key = player_keys[player_ind]
-                    if player_ind == index:
-                        print("*" , end="")
-                    if players[player_key].folded:
-                        print(player_ind, ": (Folded)", end = " ")
-                    else:
-                        print(player_ind, ": (", players[player_key].total_bet, ")", end = " ")
-                    player_hand = players[player_key].get_hand()
-                    print(player_hand.to_true_string())
-                          
-                player_key = player_keys[index]
-                
-                if players[player_key].folded:
+            for player_key in player_key_list:
+                current_player_bet = table.players[player_key].total_bet
+                if table.players[player_key].folded:
+                    print("Folded", end = " ")
                     continue
+                elif player_key == current_player_key:
+                    print("*", end="")
+                print(current_player_bet, end=" ")
+                
+            print()
+            current_player.print_hand()
 
-                print("Actions:\n\t0-6 raise\n\t7:Call\n\t8:check\n\t9:fold")
+            print("Actions:\n\t0-6 raise\n\t7:Call\n\t8:check\n\t9:fold")
+            player_action = int(input("Enter action "))
+            while True:
+                if is_legal_action(player_action, current_player_key):
+                    print(table.players[current_player_key])
+                    action(table.players[current_player_key], player_action)
+                    if player_action < 7 and player_action >= 0:
+                        i = 0
+                        round_end_ind = current_player_index + 1
+                    else:
+                        i+=1
+                    break
+                else:
+                    debug_valid_action_info(current_player_key, player_action)
                 player_action = int(input("Enter action "))
 
-                while True:
-                    if is_legal_action(player_action, player_key):
-                        print(players[player_key])
-                        action(players[player_key], player_action)
-                        break
-                    else:
-                        debug_valid_action_info(player_key, player_action)
-                    player_action = int(input("Enter action "))
-                    
-
-
+            
         table.advance_stage()
+        print(table.current_stage)
+
+
 if __name__ == "__main__":
     num_players = 8
     num_state_variables = 20
     num_outputs = 10
-    test_game()
+
+    player_networks = []
+    #hand_loop()
+    for _ in range(num_players):
+        network = simple_dqn(num_state_variables, num_outputs)
+        player_networks.append(network)
     
     """
     player_networks = []

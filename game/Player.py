@@ -33,7 +33,7 @@ class Player:
             self.checked = False
 
             self.total_money -= raise_amount
-            self.raise_amount = raise_amount
+            self.raise_amount += raise_amount
             self.total_bet += raise_amount
             return True
         return False
@@ -54,11 +54,11 @@ class Player:
 
             if (amount_needed_to_match <= self.total_money):
                 self.total_money -= amount_needed_to_match
-                self.raise_amount = amount_needed_to_match
+                self.raise_amount += amount_needed_to_match
                 self.total_bet += amount_needed_to_match
             else:
                 self.total_bet += self.total_money
-                self.raise_amount = self.total_money
+                self.raise_amount += self.total_money
                 self.total_money = 0
 
                 
@@ -78,3 +78,5 @@ class Player:
         self.total_bet = 0
         self.hand = None
         return cards_in_hand
+    def print_hand(self):
+        print(self.hand.to_true_string())

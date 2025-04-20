@@ -2,6 +2,7 @@ import random
 from game.Deck import Deck
 from game.Hand import Hand
 from game.Player import Player
+from game.HandRanker import rank_players
 
 class HoldEm:
     def __init__(self, num_decks):
@@ -84,76 +85,59 @@ class HoldEm:
             
             print(str(player.hand.to_true_string()))
 
-    def reset(self):
-        print(self.pot)
-        #return each players hand to the deck
-        possible_ranks = ["Royal Straight Flush",
-                      "Straight Flush",
-                      "4 of a kind",
-                      "Full House",
-                      "Flush",
-                      "Straight",
-                      "Three of a kind",
-                      "Two Pair",
-                      "Pair",
-                      "High Card"]
-        
-        player_ranks = []
+    def get_player_bet(self, player_key):
+        return self.players[player_key].total_bet
+    
+    def distribute_pot(self):
+        player_hands = {}
+        for player_key in self.players:
+            if not self.players[player_key].folded:
+                player_hand = self.players[player_key].get_hand()
+                player_hands[player_key] = player_hand.get_hand()
 
-        hand_ranks = self.rank_hands()
+        hand_ranks = rank_players(self.community_cards, player_hands)
+        for ranked_player_list in hand_ranks:
 
-        for key in self.players.keys():
-            hand_category = hand_ranks[key][0]
-            hand_category_value = hand_ranks[key][1]
-            hand_category_rank = possible_ranks.index(hand_category)
-            player_ranks.append((key, hand_category_rank, hand_category_value))
+            while(len(ranked_player_list) != 0):
+                min_bet_key = min(self.players, key=lambda k: self.players[k].total_bet if self.players[k].total_bet > 0 else float('inf'))
 
-        sorted_ranks = sorted(player_ranks, key=lambda x: x[1])
+                min_bet = self.players[min_bet_key].total_bet # smallest potential subpot
 
-        top_rank = sorted_ranks[0][1] # gets best hand rank
-        top_ranks = []
-        
-        for hand_rank in sorted_ranks:# adds all hand ranks that match
-            if top_rank != hand_rank[1]:
-                break
-            top_ranks.append(hand_rank)
+                subpot_contributors = [player_key for player_key, player in self.players.items() if player.total_bet > 0] 
+                subpot = 0
+                for subpot_contributor in subpot_contributors:
+                    player = self.players[subpot_contributor]
+                    player_bet = player.total_bet
+                    if player_bet <= min_bet:
+                        subpot+= player_bet
+                        player.total_bet = 0
+                    else:
+                        player.total_bet -= min_bet
+                        subpot += min_bet
 
-        if len(top_ranks) == 1:
-            self.players[top_ranks[0][0]].total_money += self.pot
-        else:
-            sorted_top_ranks = sorted(top_ranks, key=lambda x: x[2], reverse=True)
-            max_value = sorted_top_ranks[0][2]
-            winners = []
-            for rank in sorted_top_ranks:
-                print("Winner hand: ", self.players[rank[0]].get_hand().to_true_string())
-
-                if max_value != rank[2]:
+                eligible_winners = [key for key in ranked_player_list if key in subpot_contributors]
+                #catch case if there are no eligible winners in the list
+                if not eligible_winners:
                     break
-                winners.append(rank)
-            if len(winners) == 1:
-                self.players[winners[0][0]].total_money += self.pot
-            else:
-                #loop through the tied winners, whatever the lowest bet is, create a subpot off of that
-                #that subpot gets evenly distributed across each winner. 
-                #remove the lowest better(since subpots are based on whatever the lowest better is)
-                while len(winners) != 0:
-                    for winner in winners:
-                        print(self.players[winner[0]].total_bet)
-                    lowest_better = min(winners, key=lambda winner:self.players[winner[0]].total_bet)
-                    current_bet = self.players[lowest_better[0]].total_bet
-                    side_pot = current_bet * len(winners)
 
-                    for winner_ind in range(len(winners) -1, -1, -1):
-                        winner_key = winners[winner_ind][0]
-                        
-                        self.players[winner_key].total_bet -= current_bet
-                        self.players[winner_key].total_money += current_bet
+                amount_per_winner = subpot/len(eligible_winners)
+                #applies the money to the winners
+                for player_key in eligible_winners:
 
-                        if self.players[winner_key].total_bet == 0:
-                            winners.pop(winner_ind)
-                    self.pot -= side_pot
-
+                    self.players[player_key].total_money += amount_per_winner
+                    self.pot -= amount_per_winner
+                #remove any winner that had their bet zeroed out
+                for player_key_ind in range(len(ranked_player_list) - 1, -1, -1):
+                    player_key = ranked_player_list[player_key_ind]
+                    if self.players[player_key].total_bet == 0:
+                        del ranked_player_list[player_key_ind]
+            if self.pot == 0:
+                break
+        for player in self.players.values():
+            player.total_bet = 0
   
+    def reset(self):
+        self.distribute_pot()
         #return each card from hands
         for key in self.players.keys():
             cards = self.players[key].reset()

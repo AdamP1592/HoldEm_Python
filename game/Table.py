@@ -57,6 +57,7 @@ class Table:
                 return
                 
     def reset_hand(self):
+        self.rotate_blinds()
         self.game.reset()
 
     def get_blind(self, player_key):
@@ -94,6 +95,10 @@ class Table:
         
         if self.has_a_player_raised():
             return
+        
+        for player_key in self.players:
+            self.players[player_key].next_turn()
+            
         self.stages[self.current_stage]()
 
         self.current_raise = 0

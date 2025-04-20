@@ -1,5 +1,82 @@
 from itertools import combinations
 
+def rank_players(community_cards, hole_cards):
+    def card_value(card):
+        v = card.get_value()
+        if v == 1 and hasattr(card, 'high_value'):
+            return card.high_value
+        return v
+
+    def score_hand(cards):
+        vals = [card_value(c) for c in cards]
+        vals.sort(reverse=True)
+        counts = {}
+        for v in vals:
+            counts[v] = counts.get(v, 0) + 1
+        suits = [c.suit for c in cards]
+        is_flush = len(set(suits)) == 1
+        uniq = sorted(set(vals), reverse=True)
+        straight_high = None
+        for i in range(len(uniq) - 4):
+            seq = uniq[i:i+5]
+            if seq[0] - seq[4] == 4:
+                straight_high = seq[0]
+                break
+        if straight_high is None and set([14, 5, 4, 3, 2]).issubset(uniq):
+            straight_high = 5
+        is_straight = straight_high is not None
+
+        if is_straight and is_flush:
+            return (8, straight_high)
+        items = sorted(counts.items(), key=lambda x: (-x[1], -x[0]))
+        if items[0][1] == 4:
+            four = items[0][0]
+            kicker = max(v for v in vals if v != four)
+            return (7, four, kicker)
+        if items[0][1] == 3 and items[1][1] >= 2:
+            return (6, items[0][0], items[1][0])
+        if is_flush:
+            return (5, *vals)
+        if is_straight:
+            return (4, straight_high)
+        if items[0][1] == 3:
+            three = items[0][0]
+            kickers = [v for v in vals if v != three][:2]
+            return (3, three, *kickers)
+        if items[0][1] == 2 and items[1][1] == 2:
+            high_pair, low_pair = items[0][0], items[1][0]
+            kicker = max(v for v in vals if v not in (high_pair, low_pair))
+            return (2, high_pair, low_pair, kicker)
+        if items[0][1] == 2:
+            pair = items[0][0]
+            kickers = [v for v in vals if v != pair][:3]
+            return (1, pair, *kickers)
+        return (0, *vals[:5])
+
+    def best_score(seven):
+        best = None
+        for combo in combinations(seven, 5):
+            sc = score_hand(combo)
+            if best is None or sc > best:
+                best = sc
+        return best
+
+    scores = {
+        player_key: best_score(hole + community_cards)
+        for player_key, hole in hole_cards.items()
+    }
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+    ranked = []
+    prev_score = None
+    for player_key, score in sorted_scores:
+        if score != prev_score:
+            ranked.append([player_key])
+            prev_score = score
+        else:
+            ranked[-1].append(player_key)
+    return ranked
+
 def check_for_straight(cards):
     # Build a set of distinct card values.
     # For an Ace, add both its low (e.g. 1) and its high (e.g. 14) values.
@@ -121,3 +198,4 @@ def get_best_hand_value(hand, community_cards):
     # High Card
     high_card = max(total_cards, key=lambda c: c.get_value())
     return ("High Card", high_card.get_value())
+
