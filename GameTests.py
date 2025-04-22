@@ -72,6 +72,7 @@ def test_hand():
 
             
         table.advance_stage()
+        table.rotate_blinds()
         print(table.current_stage)
 
 def debug_valid_action_info(player_key, action_index):
@@ -113,7 +114,7 @@ def print_comm_cards():
 
 
 def test_state():
-    build_table(5)
+    build_table(3)
     table.apply_blind()
     table.update_pot()
     table.deal()

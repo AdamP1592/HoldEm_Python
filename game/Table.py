@@ -23,6 +23,9 @@ class Table:
         self.small_blind = 25
 
         self.current_raise = 50
+
+    def get_prev_winner(self):
+        return self.game.prev_winners
     
     def get_state(self, player_key):
 
@@ -30,14 +33,17 @@ class Table:
         num_players = len(self.players)
 
         player_keys = list(self.players.keys())
+
+        player_index = player_keys.index(player_key)
         starting_player_key = self.get_starting_player()
         starting_player_ind = player_keys.index(starting_player_key)
 
         state = [       
-                 starting_player_ind/num_players,
-                 self.players[player_key].total_money/base_money,
-                 self.pot/base_money,
-                 self.current_raise/base_money
+                 starting_player_ind / num_players,
+                 player_index / num_players,
+                 self.players[player_key].total_money / base_money,
+                 self.pot / base_money,
+                 self.current_raise / base_money
 
                 ]
         
@@ -50,9 +56,6 @@ class Table:
                 state.append(1.0)
             else:
                 state.append(0)
-
-        
-
 
         #grabs whether or not each player has folded, their total bet, and their current raise
         for key in self.players:

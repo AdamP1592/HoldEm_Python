@@ -1,4 +1,7 @@
 import tensorflow as tf
+import numpy as np
+from Memory import Memory
+import random
 class DQN():
     def __init__(self, network_structure):
         output_layer = tf.keras.layers.Dense(network_structure[len(network_structure) - 1])
@@ -31,16 +34,15 @@ class DQN():
         return self.calc_qs(outputs)
         
     @tf.function
-    def batch_train(self, states, actions, rewards, next_states, dones):
+    def batch_train(self, states:tf.Tensor, actions:tf.Tensor, rewards:tf.Tensor, next_states:tf.Tensor, dones:tf.Tensor) -> float:
         with tf.GradientTape() as tape:
-
             #main state
             outputs = self.model(states)
             q_values = self.calc_qs(outputs)
             action_mask = tf.one_hot(actions, self.num_actions)
             q_sa = tf.reduce_sum(q_values * action_mask, axis=1)
             tf.print("Q(s, a): ", q_sa)
-            #
+            
             next_outputs = self.model(next_states)
             next_q_values = self.calc_qs(next_outputs)
 
@@ -62,13 +64,41 @@ class DQN():
 
         gradients = tape.gradient(loss, self.model.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
-        return tf.reduce_mean(loss)
+
+        return float(tf.reduce_mean(loss))
+    def batch_train_memories(self, memory_sample: list[Memory]) -> float:
+        states = np.array([mem.state for mem in memory_sample], dtype=np.float32)
+        actions = np.array([mem.action for mem in memory_sample], dtype=np.int32)
+        next_states = np.array([mem.next_state for mem in memory_sample], dtype=np.float32)
+        rewards = np.array([mem.reward for mem in memory_sample], dtype=np.float32)
+        dones = np.array([float(mem.is_done) for mem in memory_sample], dtype=np.float32)
+
+    # Now convert to tensors (only once)
+        return self.batch_train(
+            tf.constant(states),
+            tf.constant(actions),
+            tf.constant(rewards),
+            tf.constant(next_states),
+            tf.constant(dones)
+        )
+
+    def forward(self, state, epsilon = 0.1) -> int:
+        if random.random() < epsilon:
+            return random.randint(0, self.num_actions -1)
+        
+        if not isinstance(state, np.ndarray):
+            state = np.array(state, dtype=np.float32)
+
+        outputs = self.model(state)
+        actions = self.calc_qs(outputs)
+
+        return tf.argmax(actions)
 
     def copy_main_to_target(self):
         self.target_model = tf.keras.models.clone_model(self.model)
         self.target_model.set_weights(self.model.get_weights())
 
 class simple_dqn(DQN):
-    def __init__(self, num_input, num_outputs):
-        structure = [num_input, 64, 64, 32, 32, 16, 16, num_outputs, num_outputs, num_outputs]
+    def __init__(self, num_inputs, num_outputs):
+        structure = [num_inputs, int(num_inputs * 1.25), int(num_inputs * 1.0), int(num_inputs *0.75), 64, 32, 16, num_outputs + 1, num_outputs + 1]
         super().__init__(structure)
