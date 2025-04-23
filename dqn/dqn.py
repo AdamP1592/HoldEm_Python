@@ -10,15 +10,18 @@ class DQN():
         layers.append(output_layer)
 
         self.model = tf.keras.Sequential(layers)
-        self.target_model = tf.keras.Sequential(layers)
+        self.target_model = None
+        self.copy_main_to_target()
 
 
-        self.optimizer = tf.keras.optimizers.Adam
-        self.loss_fn = tf.keras.losses.Huber
+        self.optimizer = tf.keras.optimizers.Adam()
+        self.loss_fn = tf.keras.losses.Huber()
 
         self.metrics = ['mae']
         self.gamma = 0.99
-        self.num_acitons = network_structure[0] - 1
+        self.num_actions = network_structure[-1] - 1
+
+        self.num_memories_trained = 0
 
     def calc_qs(self, outputs):
         advantages = outputs[:, :-1]
@@ -64,6 +67,9 @@ class DQN():
 
         gradients = tape.gradient(loss, self.model.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+        if self.num_memories_trained > 500:
+            self.num_memories_trained = 0
+            self.copy_main_to_target()
 
         return float(tf.reduce_mean(loss))
     def batch_train_memories(self, memory_sample: list[Memory]) -> float:
@@ -72,6 +78,8 @@ class DQN():
         next_states = np.array([mem.next_state for mem in memory_sample], dtype=np.float32)
         rewards = np.array([mem.reward for mem in memory_sample], dtype=np.float32)
         dones = np.array([float(mem.is_done) for mem in memory_sample], dtype=np.float32)
+        
+        self.num_memories_trained += len(memory_sample)
 
     # Now convert to tensors (only once)
         return self.batch_train(
@@ -92,7 +100,7 @@ class DQN():
         outputs = self.model(state)
         actions = self.calc_qs(outputs)
 
-        return tf.argmax(actions)
+        return int(tf.argmax(actions).numpy())
 
     def copy_main_to_target(self):
         self.target_model = tf.keras.models.clone_model(self.model)
