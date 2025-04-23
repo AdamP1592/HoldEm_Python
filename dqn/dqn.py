@@ -1,6 +1,8 @@
 import tensorflow as tf
 import numpy as np
-from Memory import Memory
+
+from .Memory import Memory
+
 import random
 class DQN():
     def __init__(self, network_structure):
@@ -96,12 +98,12 @@ class DQN():
         
         if not isinstance(state, np.ndarray):
             state = np.array(state, dtype=np.float32)
-
+        state = tf.expand_dims(state, axis=0)
         outputs = self.model(state)
         actions = self.calc_qs(outputs)
 
-        return int(tf.argmax(actions).numpy())
-
+        return int(tf.argmax(actions, axis=1)[0].numpy())
+    
     def copy_main_to_target(self):
         self.target_model = tf.keras.models.clone_model(self.model)
         self.target_model.set_weights(self.model.get_weights())

@@ -88,9 +88,14 @@ def play_hand(player_models):
     negative_memory_buffers = [ReplayBuffer(300) for _ in range(len(table.players))]
 
     pre_flop = True # to ensure the current hand is the inital pre-flop
-    while table.current_stage != "pre-flop" or pre_flop:
+    break_case = False
+
+    while (table.current_stage != "pre-flop" or pre_flop) and not break_case:
+        print(table.current_stage)
         if table.current_stage == "flop":
+            print("Dealing")
             table.deal()
+
         pre_flop = False
          
         i = 0
@@ -110,9 +115,9 @@ def play_hand(player_models):
             #check if there is only one active player they win
             active_players = [p_key for p_key, p in table.players.items() if not p.folded]
             if len(active_players) == 1:
-                table.player_won(active_players[0])
-                table.reset_hand()
-                return  # or return, if in function
+                print("Only 1 active player")
+                break_case = True
+                break  # or return, if in function
             
             print("Current Pot: ", table.pot)
             print("Current Raise Amount", table.current_raise)
@@ -130,13 +135,16 @@ def play_hand(player_models):
                 print(current_player_bet, end=" ")
                 
             print()
-            current_player.print_hand()
+            if current_player.get_hand():
+                current_player.print_hand()
 
             print("Actions:\n\t0-6 raise\n\t7:Call\n\t8:check\n\t9:fold")
+            print(len(table_state))
             player_action = player_models[current_player_index].forward(table_state)
             while True:
                 if is_legal_action(player_action, current_player_key):
                     print(table.players[current_player_key])
+                    print(player_action)
                     action(table.players[current_player_key], player_action)
                     new_state = table.get_state(current_player_key)
                     if player_action < 7 and player_action >= 0:
@@ -150,11 +158,22 @@ def play_hand(player_models):
                     memory_buffers[current_player_index].store_memory(mem)
                     break
                 else:
+                    print("Bad Action:", player_action)
                     mem = Memory(table_state, player_action, -1.0, table_state, False)
                     negative_memory_buffers[current_player_index].store_memory(mem)
-            if negative_memory_buffers[current_player_index].size > 50: 
+                    #if action taken is invalid choose a random aciton with egreedy
+                    player_action = player_models[current_player_index].forward(table_state, 1.0)
+            if len(negative_memory_buffers[current_player_index]) > 50: 
                 memories = negative_memory_buffers[current_player_index].sample(10)
                 player_models[current_player_index].batch_train_memories(memories)
+        
+        table.advance_stage()
+
+
+    for pk in table.players:
+        print(table.players[pk].folded, table.current_stage)
+
+    print(table.players.keys())
 
     table.reset_hand()
     rewards = get_rewards(starting_money)
@@ -173,7 +192,8 @@ def play_hand(player_models):
             memory.reward = rewards[player_key] * (gamma ** memory_ind)
         if memory_buffer.buffer:
             memory_buffer.buffer[-1].is_done = True
-        memory_buffer.merge_percentage_of_self(negative_memory_buffers[player_key_index], 0.05)
+            memory_buffer.merge_percentage_of_self(negative_memory_buffers[player_key_index], 0.05)
+    print("Memory Buffers:", memory_buffers)
     return memory_buffers
 
 
@@ -199,11 +219,8 @@ def get_rewards(starting_money:dict):
     return rewards
 
 
-    
-
-
 if __name__ == "__main__":
-    num_players = 2
+    num_players = 8
 
     # State encoding:
     # 52 one-hot for hole cards
@@ -220,7 +237,7 @@ if __name__ == "__main__":
     #     - 1 raise amount / base_money
 
 
-    num_state_variables = 113 + (num_players * 3)
+    num_state_variables = 113 + (num_players * 4)
 
     num_outputs = 10
 
@@ -237,6 +254,8 @@ if __name__ == "__main__":
         for network_index in range(len(player_networks)):
             sample_size = min(100, len(memory_buffers[network_index]))
             memories = memory_buffers[network_index].sample(100)
+
+            print(memories[0])
             player_networks[network_index].batch_train_memories(memories)
     
     """

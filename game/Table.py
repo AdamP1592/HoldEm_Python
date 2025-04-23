@@ -12,9 +12,9 @@ class Table:
         self.current_stage = "pre-flop"
 
         self.players = {}
+        self.game.players = self.players # shared instance
 
         self.total_raises = {}
-        self.game.players = self.players # shared instance
         self.community_cards = self.game.community_cards #shared instance
         self.pot = self.game.pot # shared instance
 
@@ -28,7 +28,7 @@ class Table:
         self.blind_applied = False
 
     def get_prev_winner(self):
-        return self.game.prev_winners
+        return self.game.last_winners
     
     def get_state(self, player_key):
 
@@ -48,7 +48,6 @@ class Table:
                  self.pot / base_money,
                  self.current_raise / base_money
                 ]
-        
 
         #encodes stage
         stage_names = list(self.stages.keys())
@@ -73,7 +72,10 @@ class Table:
         
         #encodes player cards in one-hot style encoding
         hole_map = [0] * 52
-        cards_in_hand = self.players[player_key].get_hand().get_cards()
+        hand = self.players[player_key].get_hand()
+        cards_in_hand = []
+        if hand:
+            cards_in_hand = hand.get_cards()
         for card in cards_in_hand:
             idx = card.get_encoded_value()
             hole_map[idx] = 1
@@ -84,7 +86,8 @@ class Table:
         board_map = [0] * 52
         for card in self.community_cards:
             if card != None:
-                idx = card.get_encoded_value()
+                idx = card.get_encoded_value() - 1
+                
                 board_map[idx] = 1
 
         state.extend(board_map)
@@ -170,9 +173,6 @@ class Table:
         self.players.pop(player_key)
 
     def advance_stage(self):
-        
-        if self.has_a_player_raised():
-            return
         
         for player_key in self.players:
             self.players[player_key].next_turn()

@@ -92,13 +92,29 @@ class HoldEm:
     
     def distribute_pot(self):
         player_hands = {}
+        num_players_still_in = 0
         for player_key in self.players:
             self.last_winners[player_key] = 0
             if not self.players[player_key].folded:
-                
+                num_players_still_in +=1
                 player_hand = self.players[player_key].get_hand()
-                player_hands[player_key] = player_hand.get_cards()
+                #catch case for a pre-flop win
+                if player_hand:
+                    player_hands[player_key] = player_hand.get_cards()
+                else: 
+                    player_hands[player_key] = None
 
+        if num_players_still_in == 1:
+            keys = list(self.players.keys())
+            print(keys)
+            player_key = keys[0]
+            self.players[player_key].total_money += self.pot
+            self.players[player_key].total_bet = 0
+            return
+        
+            
+        print("Hands: ", player_hands)
+        print("Comm cards", self.community_cards)
         hand_ranks = rank_players(self.community_cards, player_hands)
         for ranked_player_list in hand_ranks:
 
@@ -145,8 +161,9 @@ class HoldEm:
         #return each card from hands
         for key in self.players.keys():
             cards = self.players[key].reset()
-            for card in cards:
-                self.deck.return_card(card)
+            if cards:
+                for card in cards:
+                    self.deck.return_card(card)
         
         #return each card from community cards
         for cardInd in range(len(self.community_cards)):
