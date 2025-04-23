@@ -26,17 +26,22 @@ class Player:
             return True
         return False
 
-    def raise_(self, raise_amount):    
-        if not self.folded and (raise_amount <= (self.total_money - self.total_bet)):
-            self.raise_applied = False
-            self.raised = True
-            self.checked = False
+    def raise_(self, raise_amount):  
+        if self.folded:
+            return False
+        
+        if raise_amount > self.total_money:
+            raise_amount = self.total_money
+        
+        self.raise_applied = False
+        self.raised = True
+        self.checked = False
 
-            self.total_money -= raise_amount
-            self.raise_amount += raise_amount
-            self.total_bet += raise_amount
-            return True
-        return False
+        self.total_money -= raise_amount
+        self.raise_amount += raise_amount
+        self.total_bet += raise_amount
+    
+        return True
 
     def fold(self):
         self.folded = True
@@ -60,7 +65,6 @@ class Player:
                 self.total_bet += self.total_money
                 self.raise_amount += self.total_money
                 self.total_money = 0
-
                 
             return True
         

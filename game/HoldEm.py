@@ -15,6 +15,8 @@ class HoldEm:
         self.community_cards = [None] * 5
         self.community_cards_index = 0
 
+        self.last_winners = {}
+
     def update_pot(self):
         self.pot = 0
         for player_key in self.players:
@@ -91,7 +93,9 @@ class HoldEm:
     def distribute_pot(self):
         player_hands = {}
         for player_key in self.players:
+            self.last_winners[player_key] = 0
             if not self.players[player_key].folded:
+                
                 player_hand = self.players[player_key].get_hand()
                 player_hands[player_key] = player_hand.get_cards()
 
@@ -123,7 +127,7 @@ class HoldEm:
                 amount_per_winner = subpot/len(eligible_winners)
                 #applies the money to the winners
                 for player_key in eligible_winners:
-
+                    self.last_winners[player_key] += amount_per_winner
                     self.players[player_key].total_money += amount_per_winner
                     self.pot -= amount_per_winner
                 #remove any winner that had their bet zeroed out

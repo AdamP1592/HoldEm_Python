@@ -6,12 +6,14 @@ class Table:
     
     def __init__(self):
         self.game = HoldEm(1)
-        self.stages = {"pre-flop":self.game.flop, "flop": self.game.turn, "turn": self.game.river, "river": self.game.reset }
+        self.stages = {"pre-flop":self.game.flop, "flop": self.game.turn, "turn": self.game.river, "river": self.reset_hand }
 
         self.hand_done = False
         self.current_stage = "pre-flop"
 
         self.players = {}
+
+        self.total_raises = {}
         self.game.players = self.players # shared instance
         self.community_cards = self.game.community_cards #shared instance
         self.pot = self.game.pot # shared instance
@@ -23,6 +25,7 @@ class Table:
         self.small_blind = 25
 
         self.current_raise = 50
+        self.blind_applied = False
 
     def get_prev_winner(self):
         return self.game.prev_winners
@@ -44,7 +47,6 @@ class Table:
                  self.players[player_key].total_money / base_money,
                  self.pot / base_money,
                  self.current_raise / base_money
-
                 ]
         
 
@@ -67,6 +69,7 @@ class Table:
 
             state.append(player.total_bet/base_money)
             state.append(player.raise_amount/base_money)
+            state.append(self.total_raises[key])
         
         #encodes player cards in one-hot style encoding
         hole_map = [0] * 52
@@ -86,24 +89,13 @@ class Table:
 
         state.extend(board_map)
 
-        
-
         return state
-
-    #state enconding: (5000 is the base amount of money for each player)
-    # player position: (player index / num players)
-    # player money: (current_money/ 5000)
-    # call amount (pot - [sum(every other players bet) or blind amount]
-    # cards in hand (2)
-    # community cards (5)
-    # whether or not each other player has raised this round (8)
-    # active players
-    # betting round
-
 
     def update_pot(self):
         self.pot = 0
         for player_key in self.players:
+
+            self.total_raises[player_key] += 1
             player = self.players[player_key]
             self.pot += player.total_bet
             self.current_raise = max(self.current_raise, player.raise_amount)
@@ -115,12 +107,14 @@ class Table:
                 return player_keys[(key_ind + 1) % len(player_keys)]
         
     def apply_blind(self):
-        big_blind_player = self.players[self.big_blind_key]
-        big_blind_player.raise_(self.big_blind)
+        if not self.blind_applied:
+            big_blind_player = self.players[self.big_blind_key]
+            big_blind_player.raise_(self.big_blind)
 
-        small_blind_player = self.players[self.small_blind_key]
-        small_blind_player.raise_(self.small_blind)
+            small_blind_player = self.players[self.small_blind_key]
+            small_blind_player.raise_(self.small_blind)
 
+            self.blind_applied = True
 
     def rotate_blinds(self):
         player_keys = list(self.players.keys())
@@ -135,7 +129,13 @@ class Table:
                 
     def reset_hand(self):
         self.rotate_blinds()
+        self.blind_applied = False
         self.game.reset()
+        for player_key in self.total_raises:
+            self.total_raises[player_key] = 0
+    
+    def get_winners(self):
+        return self.game.last_winners
 
     def get_blind(self, player_key):
         if player_key == self.big_blind_key:
@@ -163,6 +163,7 @@ class Table:
 
         p = Player()
         self.players[player_id] = p
+        self.total_raises[player_id] = 0
         return p
     
     def remove_player(self, player_key):
