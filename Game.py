@@ -229,7 +229,7 @@ def get_rewards(starting_money:dict):
 
 
 if __name__ == "__main__":
-    num_players = 8
+    num_players = 3
 
     # State encoding:
     # 52 one-hot for hole cards
@@ -254,28 +254,33 @@ if __name__ == "__main__":
 
     player_networks = []
 
+
     num_losses = [0 for _ in range(num_players)]
 
-    
+    build_table(num_players)
+
+    #enerates all the networks
     for _ in range(num_players):
         network = simple_dqn(num_state_variables, num_outputs)
         player_networks.append(network)
-    build_table(len(player_networks))
-
 
     for eps in range(num_episodes):
+        starting_money = [player.total_money for player in table.players.values()]
         memory_buffers = play_hand(player_networks)
 
-        for _ in range(10):
-            for network_index in range(len(player_networks)):
-                sample_size = min(100, len(memory_buffers[network_index]))
-                memories = memory_buffers[network_index].sample(sample_size)
-                player_networks[network_index].batch_train_memories(memories)
+        for network_index in range(len(player_networks)):
+            sample_size = min(100, len(memory_buffers[network_index]))
+            memories = memory_buffers[network_index].sample(sample_size)
+            player_networks[network_index].batch_train_memories(memories)
+
         #resets each player
         for index, key in enumerate(table.players):
             player = table.players[key]
-            if player.total_money == 0:
+            starting_balance = starting_money[index]
+
+            if player.total_money < starting_balance:
                 num_losses[index] += 1
+
             player.total_money = 5000
         print(table.game.deck.size)
     for loss_count in num_losses:

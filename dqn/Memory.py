@@ -10,12 +10,12 @@ class Memory():
         input_str += value + ", "
         return input_str
 
-def __str__(self):
-    return (
-        f"Starting State:\n{', '.join(str(v) for v in self.state)}\n"
-        f"Action: {self.action}\n"
-        f"Reward: {self.reward}\n"
-        f"Finished: {self.is_done}\n"
-        f"Next State:\n{', '.join(str(v) for v in self.next_state)}"
-    )
+    def __str__(self):
+        return (
+            f"Starting State:\n{', '.join(str(v) for v in self.state)}\n"
+            f"Action: {self.action}\n"
+            f"Reward: {self.reward}\n"
+            f"Finished: {self.is_done}\n"
+            f"Next State:\n{', '.join(str(v) for v in self.next_state)}"
+        )
 

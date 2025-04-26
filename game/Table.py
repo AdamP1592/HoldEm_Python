@@ -188,8 +188,6 @@ class Table:
         ind = stageKeys.index(self.current_stage)
 
         self.current_stage = stageKeys[(ind + 1) % len(stageKeys)]
-        if self.current_stage == "flop":
-            self.deal()
     
     def print_comm_cards(self):
         for card in self.community_cards:

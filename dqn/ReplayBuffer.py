@@ -1,14 +1,19 @@
 import random
+
+from game.Logger import Logger
 class ReplayBuffer():
 
     def __init__(self, max_entries):
         self.buffer = []
         self.max_entries = max_entries
+        self.logger = Logger()
     
     def store_memory(self, memory):
+        
+        self.logger.log("Stored Memory")
         if len(self.buffer) > self.max_entries:
             del self.buffer[0]
-
+        self.logger.log(str(memory))
         self.buffer.append(memory)
     
     def sample(self, num_entries:int)->list:

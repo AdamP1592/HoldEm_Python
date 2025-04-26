@@ -1,5 +1,6 @@
 import random
 from game.Card import Card
+from game.Logger import Logger
 
 class Deck:
     def __init__(self, num_decks):
@@ -39,15 +40,18 @@ class Deck:
         random.shuffle(self.cards)
 
     def deal_card(self):
+        l = Logger()
+        l.log("Card being delt: ", end="")
         if not self.cards:
             raise Exception("No cards left in the deck.")
         card = self.cards.pop()
+        l.log(str(card))
         self.size -= 1
         return card
 
     def return_card(self, card):
         self.cards.append(card)
-        self.size+=1
+        self.size += 1
 
     def index_of(self, ls, val):
         for i, item in enumerate(ls):
@@ -59,4 +63,4 @@ class Deck:
         return tuple(self.cards)
 
     def __str__(self):
-        return ", ".join(str(card) for card in self.cards)
+        return ", ".join(str(card) if card is not None else "Empty" for card in self.cards)

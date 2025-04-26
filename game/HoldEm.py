@@ -16,9 +16,12 @@ class HoldEm:
         self.community_cards = [None] * 5
         self.community_cards_index = 0
 
-        self.logger = Logger()
+        self.logger = Logger(reset=True)
 
         self.last_winners = {}
+
+        self.logger.log("Num Cards: " + str(len(self.deck.cards)))
+        self.logger.log("Deck: " + str(self.deck))
 
     def update_pot(self):
         self.pot = 0
@@ -27,6 +30,7 @@ class HoldEm:
     def river(self):
         self.update_pot()
         c = self.deck.deal_card()
+        self.logger.log("River: " + str(c))
         c.visible = True
         self.community_cards[4] = c
         self.community_cards_index += 1
@@ -34,17 +38,20 @@ class HoldEm:
     def turn(self):
         self.update_pot()
         c = self.deck.deal_card()
+        self.logger.log("Turn: " + str(c))
         c.visible = True
         self.community_cards[3] = c
         self.community_cards_index += 1
 
     def flop(self):
         self.update_pot()
+        self.logger.log("Flop: ")
         for i in range(3):
             c = self.deck.deal_card()
             c.visible = True
             self.community_cards[i] = c
-        self.community_cards_index = 3 - 1
+            self.logger.log("\t" + str(c))
+        self.community_cards_index = 2
 
 
     def rank_hands(self):
@@ -71,13 +78,15 @@ class HoldEm:
 
     def deal_hands(self):
         self.pot = 0
-        for player in self.players.values():
+        self.logger.log("Dealing Hands: ")
+        for player_key, player in self.players.items():
+            
             card1 = self.deck.deal_card()
-            card1.visible = False
             card2 = self.deck.deal_card()
-            card2.visible = False
+            self.logger.log("Player :" + player_key, end = "")
+            self.logger.log(f"({card1}, {card2})")
             player.hand = Hand([card1, card2])
-            self.hands.append(player.hand)
+            
 
     def print_deck(self):
         cards = self.deck.get_all_cards()
@@ -158,19 +167,27 @@ class HoldEm:
     def reset(self):
         self.distribute_pot()
         #return each card from hands
-        self.logger.log(str(self.deck))
+
+        self.logger.log("Num Cards: " + str(len(self.deck.cards)))
+        self.logger.log("Deck: " + str(self.deck))
+
+        self.logger.log("Returning Cards: ")
         for key in self.players.keys():
             cards = self.players[key].reset()
             if cards:
                 for card in cards:
                     self.deck.return_card(card)
         
-        #return each card from community cards
+        #return each card from community cards 
         for cardInd in range(len(self.community_cards)):
-            self.deck.return_card(self.community_cards[cardInd])
-            self.community_cards[cardInd] = None
+            #since a hand can end before all cc are in the hole
+            if self.community_cards[cardInd] != None:
+                self.deck.return_card(self.community_cards[cardInd])
+                self.community_cards[cardInd] = None
 
         self.community_cards_index = 0
-        self.logger.log(str(self.deck))
+        self.logger.log("Num Cards: " + str(len(self.deck.cards)))
+        self.logger.log("Deck: " + str(self.deck))
+
 
         self.deck.shuffle()

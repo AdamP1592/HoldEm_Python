@@ -1,9 +1,11 @@
 class Logger():
-    def __init__(self, fp = "/logs", file_name ="log.log"):
-        self.folder_path = fp
+    def __init__(self, folder_path = "/logs/", file_name ="log.log", reset=False):
+        self.folder_path = "." + folder_path
         self.file_name = file_name
-        self.full_filepath = "." + fp + file_name #generates relative folder path
+        self.full_filepath = self.folder_path + file_name #generates relative folder path
         self.generate_path()
+        if reset:
+            self.clear_file()
     
     def generate_path(self):
         import os
@@ -16,6 +18,6 @@ class Logger():
     def clear_file(self):
         open(self.full_filepath, 'w+').close()
     
-    def log(self, log_str):
-        with open(self.full_filepath, "a") as f:
-            f.write(log_str + '\n')
+    def log(self, log_str, end = "\n"):
+        with open(self.full_filepath, "a", encoding="utf-8") as f:
+            f.write(log_str + end)
