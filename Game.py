@@ -59,6 +59,7 @@ def is_legal_action(action_index, player_key):
             return player.total_money > 0  # Can only go all-in if you have chips
         case _:  #Raise
             if player.total_money == 0:
+                #cant raise if you have no money.
                 return False
 
             raise_amount = 0
@@ -70,8 +71,6 @@ def is_legal_action(action_index, player_key):
 
     return False
 def play_hand(player_models):
-    build_table(len(player_models))
-
     table.apply_blind()
     table.update_pot()
     starting_money = {}
@@ -89,7 +88,8 @@ def play_hand(player_models):
 
     pre_flop = True # to ensure the current hand is the inital pre-flop
     break_case = False
-
+    print(table.current_stage)
+    
     while (table.current_stage != "pre-flop" or pre_flop) and not break_case:
         print(table.current_stage)
         if table.current_stage == "flop":
@@ -114,68 +114,65 @@ def play_hand(player_models):
             table_state = table.get_state(current_player_key)
             #check if there is only one active player they win
             active_players = [p_key for p_key, p in table.players.items() if not p.folded]
-            if len(active_players) == 1:
-                print("Only 1 active player")
-                break_case = True
-                break  # or return, if in function
-            
-            print("Current Pot: ", table.pot)
-            print("Current Raise Amount", table.current_raise)
-            print("Player: ", current_player_index)
+            if len(active_players) != 1:
+                print("Current Pot: ", table.pot)
+                print("Current Raise Amount", table.current_raise)
+                print("Player: ", current_player_index)
 
-            table.print_comm_cards()
+                table.print_comm_cards()
 
-            for player_key in player_key_list:
-                current_player_bet = table.players[player_key].total_bet
-                if table.players[player_key].folded:
-                    print("Folded", end = " ")
-                    continue
-                elif player_key == current_player_key:
-                    print("*", end="")
-                print(current_player_bet, end=" ")
-                
-            print()
-            if current_player.get_hand():
-                current_player.print_hand()
+                for player_key in player_key_list:
+                    current_player_bet = table.players[player_key].total_bet
+                    if table.players[player_key].folded:
+                        print("Folded", end = " ")
+                        continue
+                    elif player_key == current_player_key:
+                        print("*", end="")
+                    print(current_player_bet, end=" ")
+                    
+                print()
+                if current_player.get_hand():
+                    current_player.print_hand()
 
-            print("Actions:\n\t0-6 raise\n\t7:Call\n\t8:check\n\t9:fold")
-            print(len(table_state))
-            player_action = player_models[current_player_index].forward(table_state)
-            while True:
-                if is_legal_action(player_action, current_player_key):
-                    print(table.players[current_player_key])
-                    print(player_action)
-                    action(table.players[current_player_key], player_action)
-                    new_state = table.get_state(current_player_key)
-                    if player_action < 7 and player_action >= 0:
-                        i = 0
-                        round_end_ind = current_player_index + 1
+                print("Actions:\n\t0-6 raise\n\t7:Call\n\t8:check\n\t9:fold")
+                print("Table State:", len(table_state))
+                player_action = player_models[current_player_index].forward(table_state)
+                while True:
+                    if is_legal_action(player_action, current_player_key):
+                        print(table.players[current_player_key])
+                        print(player_action)
+                        action(table.players[current_player_key], player_action)
+                        new_state = table.get_state(current_player_key)
+                        if player_action < 7 and player_action >= 0:
+                            i = 0
+                            round_end_ind = current_player_index + 1
+                        else:
+                            i+=1
+                        mem = Memory(table_state, player_action, 0, new_state, False)
+                        #reward will only be assigned after the hand is done
+                        #if the player wins, then all memories stored will be 
+                        memory_buffers[current_player_index].store_memory(mem)
+                        break
                     else:
-                        i+=1
-                    mem = Memory(table_state, player_action, 0, new_state, False)
-                    #reward will only be assigned after the hand is done
-                    #if the player wins, then all memories stored will be 
-                    memory_buffers[current_player_index].store_memory(mem)
-                    break
-                else:
-                    print("Bad Action:", player_action)
-                    mem = Memory(table_state, player_action, -1.0, table_state, False)
-                    negative_memory_buffers[current_player_index].store_memory(mem)
-                    #if action taken is invalid choose a random aciton with egreedy
-                    player_action = player_models[current_player_index].forward(table_state, 1.0)
-            if len(negative_memory_buffers[current_player_index]) > 50: 
-                memories = negative_memory_buffers[current_player_index].sample(10)
-                player_models[current_player_index].batch_train_memories(memories)
-        
-        table.advance_stage()
-
+                        mem = Memory(table_state, player_action, -1.0, table_state, False)
+                        negative_memory_buffers[current_player_index].store_memory(mem)
+                        #if action taken is invalid choose a random aciton with egreedy
+                        player_action = player_models[current_player_index].forward(table_state, 1.0)
+                if len(negative_memory_buffers[current_player_index]) > 50: 
+                    memories = negative_memory_buffers[current_player_index].sample(10)
+                    player_models[current_player_index].batch_train_memories(memories)
+            else:
+                break_case = True
+                break
+        if not break_case:
+            table.advance_stage()
 
     for pk in table.players:
         print(table.players[pk].folded, table.current_stage)
 
-    print(table.players.keys())
+    if table.current_stage != "pre-flop":# catch case if the hand ended before a reset
+        table.reset_hand()
 
-    table.reset_hand()
     rewards = get_rewards(starting_money)
 
     player_keys = list(rewards.keys())
@@ -185,15 +182,20 @@ def play_hand(player_models):
     for player_key_index in range(len(player_keys)):
         
         player_key = player_keys[player_key_index]
+        player = table.players[player_key]
         memory_buffer = memory_buffers[player_key_index]
 
         for memory_ind in range(len(memory_buffer.buffer)):
             memory = memory_buffer.buffer[memory_ind]
+            
+            #reward gets distributed with diminishing reward 
+            #across each move
             memory.reward = rewards[player_key] * (gamma ** memory_ind)
+
         if memory_buffer.buffer:
             memory_buffer.buffer[-1].is_done = True
             memory_buffer.merge_percentage_of_self(negative_memory_buffers[player_key_index], 0.05)
-    print("Memory Buffers:", memory_buffers)
+
     return memory_buffers
 
 
@@ -203,15 +205,22 @@ def get_rewards(starting_money:dict):
     prev_winners = table.get_prev_winner() # those that won
     rewards = {}
 
+    percent_change_in_money = {}
+
     for player_key in table.players:
         #amount won relative to the base hand size
         percent_change = (table.players[player_key].total_money - starting_money[player_key]) / (starting_money[player_key])
         rewards[player_key] = percent_change
+        #punishment for folding
+        rewards[player_key] += int(table.players[player_key].folded) * -0.02
+
+        percent_change_in_money[player_key] = percent_change
 
     for winner_key in prev_winners:
         rewards[winner_key] += 0.1 * abs(rewards[winner_key])
         # multiplies the reward by the absolute value of the percent change
 
+    #normalizes reward to (-1.0, 1.0)
     max_reward = max(abs(x) for x in rewards.values())
     for player_key in rewards:
         rewards[player_key] /= max_reward
@@ -241,22 +250,36 @@ if __name__ == "__main__":
 
     num_outputs = 10
 
+    num_episodes = 100
+
     player_networks = []
+
+    num_losses = [0 for _ in range(num_players)]
 
     
     for _ in range(num_players):
         network = simple_dqn(num_state_variables, num_outputs)
         player_networks.append(network)
+    build_table(len(player_networks))
 
-    memory_buffers = play_hand(player_networks)
 
-    for _ in range(10):
-        for network_index in range(len(player_networks)):
-            sample_size = min(100, len(memory_buffers[network_index]))
-            memories = memory_buffers[network_index].sample(100)
+    for eps in range(num_episodes):
+        memory_buffers = play_hand(player_networks)
 
-            print(memories[0])
-            player_networks[network_index].batch_train_memories(memories)
+        for _ in range(10):
+            for network_index in range(len(player_networks)):
+                sample_size = min(100, len(memory_buffers[network_index]))
+                memories = memory_buffers[network_index].sample(sample_size)
+                player_networks[network_index].batch_train_memories(memories)
+        #resets each player
+        for index, key in enumerate(table.players):
+            player = table.players[key]
+            if player.total_money == 0:
+                num_losses[index] += 1
+            player.total_money = 5000
+        print(table.game.deck.size)
+    for loss_count in num_losses:
+        print(loss_count)
     
     """
     player_networks = []

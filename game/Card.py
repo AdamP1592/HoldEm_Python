@@ -38,4 +38,4 @@ class Card:
         return self.card_name
 
     def __str__(self):
-        return f"{self.get_name()} of {self.suit}"
+        return f"{self.get_true_name()} of {self.suit}"

@@ -3,6 +3,7 @@ from game.Deck import Deck
 from game.Hand import Hand
 from game.Player import Player
 from game.HandRanker import rank_players
+from game.Logger import Logger
 
 class HoldEm:
     def __init__(self, num_decks):
@@ -14,6 +15,8 @@ class HoldEm:
         self.pot = 0
         self.community_cards = [None] * 5
         self.community_cards_index = 0
+
+        self.logger = Logger()
 
         self.last_winners = {}
 
@@ -106,15 +109,11 @@ class HoldEm:
 
         if num_players_still_in == 1:
             keys = list(self.players.keys())
-            print(keys)
             player_key = keys[0]
             self.players[player_key].total_money += self.pot
             self.players[player_key].total_bet = 0
             return
         
-            
-        print("Hands: ", player_hands)
-        print("Comm cards", self.community_cards)
         hand_ranks = rank_players(self.community_cards, player_hands)
         for ranked_player_list in hand_ranks:
 
@@ -159,6 +158,7 @@ class HoldEm:
     def reset(self):
         self.distribute_pot()
         #return each card from hands
+        self.logger.log(str(self.deck))
         for key in self.players.keys():
             cards = self.players[key].reset()
             if cards:
@@ -168,7 +168,9 @@ class HoldEm:
         #return each card from community cards
         for cardInd in range(len(self.community_cards)):
             self.deck.return_card(self.community_cards[cardInd])
-        self.community_cards= [None] * 5
+            self.community_cards[cardInd] = None
+
         self.community_cards_index = 0
+        self.logger.log(str(self.deck))
 
         self.deck.shuffle()

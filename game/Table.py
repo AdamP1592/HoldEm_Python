@@ -77,7 +77,7 @@ class Table:
         if hand:
             cards_in_hand = hand.get_cards()
         for card in cards_in_hand:
-            idx = card.get_encoded_value()
+            idx = card.get_encoded_value() - 1 #converts value (1, 52) to index(0, 51)
             hole_map[idx] = 1
 
         state.extend(hole_map)
@@ -131,8 +131,12 @@ class Table:
                 return
                 
     def reset_hand(self):
+        self.current_stage = "pre-flop"
+        self.game.community_cards_index = 0
+
         self.rotate_blinds()
         self.blind_applied = False
+        print("Resetting")
         self.game.reset()
         for player_key in self.total_raises:
             self.total_raises[player_key] = 0
@@ -184,6 +188,8 @@ class Table:
         ind = stageKeys.index(self.current_stage)
 
         self.current_stage = stageKeys[(ind + 1) % len(stageKeys)]
+        if self.current_stage == "flop":
+            self.deal()
     
     def print_comm_cards(self):
         for card in self.community_cards:
