@@ -23,10 +23,10 @@ class Table:
         self.big_blind_key = None
         self.small_blind_key = None
 
-        self.big_blind = 50
-        self.small_blind = 25
+        self.big_blind = 250
+        self.small_blind = 125
 
-        self.current_raise = 50
+        self.current_raise = 250
         self.blind_applied = False
 
     def get_prev_winner(self):

@@ -386,11 +386,16 @@ if __name__ == "__main__":
     print(reward_weights)
 
     #enerates all the networks
+    
     for _ in range(num_players):
         network = simple_dqn(num_state_variables, num_outputs)
         player_networks.append(network)
 
     for gen in range(num_generations):
+
+        for net in player_networks:
+            net.reset()
+
         for eps in range(num_episodes):
             starting_money = [player.total_money for player in table.players.values()]
             memory_buffers = play_hand_v2(player_networks)

@@ -6,15 +6,7 @@ from .Memory import Memory
 import random
 class DQN():
     def __init__(self, network_structure):
-        output_layer = tf.keras.layers.Dense(network_structure[len(network_structure) - 1])
-        del network_structure[-1]
-        layers = [tf.keras.layers.Dense(num_neurons, activation=tf.nn.leaky_relu) for num_neurons in network_structure]
-        layers.append(output_layer)
-
-        self.model = tf.keras.Sequential(layers)
-        self.target_model = tf.keras.Sequential(layers)
-        self.copy_main_to_target()
-
+        self.network_structure = network_structure[:]
 
         self.optimizer = tf.keras.optimizers.Adam()
         self.loss_fn = tf.keras.losses.Huber()
@@ -23,6 +15,32 @@ class DQN():
         self.gamma = 0.99
         self.num_actions = network_structure[-1] - 1
 
+        self.num_memories_trained = 0
+        
+        self.build_model(network_structure)
+
+    def get_layers(self, network_structure):
+        network_structure = network_structure[:]
+        output_layer = tf.keras.layers.Dense(network_structure[len(network_structure) - 1])
+        del network_structure[-1]
+
+        layers = [tf.keras.layers.Dense(num_neurons, activation=tf.nn.leaky_relu) for num_neurons in network_structure]
+        layers.append(output_layer)
+
+        return layers
+
+    def build_model(self, network_structure):
+
+        layers = self.get_layers(network_structure)
+        self.model = tf.keras.Sequential(layers)
+
+        layers = self.get_layers(network_structure)
+        self.target_model = tf.keras.Sequential(layers)
+        
+        self.copy_main_to_target()
+
+    def reset(self):
+        self.build_model(self.network_structure)
         self.num_memories_trained = 0
 
     def calc_qs(self, outputs):
@@ -115,5 +133,5 @@ class DQN():
 
 class simple_dqn(DQN):
     def __init__(self, num_inputs, num_outputs):
-        structure = [num_inputs, int(num_inputs * 1.25), int(num_inputs * 1.0), int(num_inputs *0.75), 64, 32, 16, num_outputs + 1, num_outputs + 1]
+        structure = [num_inputs, int(num_inputs * 1.25), int(num_inputs * 1.0), int(num_inputs *0.75), int(num_inputs * 0.75), int(num_inputs * 0.5), int(num_inputs * 0.5), int(num_inputs * 0.5), int(num_inputs * 0.25), int(num_inputs * 0.5), num_outputs + 1, num_outputs + 1]
         super().__init__(structure)
