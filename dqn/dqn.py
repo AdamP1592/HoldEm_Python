@@ -12,7 +12,7 @@ class DQN():
         layers.append(output_layer)
 
         self.model = tf.keras.Sequential(layers)
-        self.target_model = None
+        self.target_model = tf.keras.Sequential(layers)
         self.copy_main_to_target()
 
 
@@ -105,7 +105,6 @@ class DQN():
         return int(tf.argmax(actions, axis=1)[0].numpy())
     
     def copy_main_to_target(self):
-        self.target_model = tf.keras.models.clone_model(self.model)
         self.target_model.set_weights(self.model.get_weights())
 
 class simple_dqn(DQN):

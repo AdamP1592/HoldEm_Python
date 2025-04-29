@@ -1,7 +1,12 @@
 from game.Table import Table
+
+from game.Logger import Logger
 from dqn import *
 
 from GameTests import *
+
+l = Logger(reset=True)
+Logger.is_logging = False
 
 table = Table()
 players = []
@@ -70,6 +75,170 @@ def is_legal_action(action_index, player_key):
             return raise_amount > table.current_raise and raise_amount < player.total_money
 
     return False
+
+def get_active_players(starting_player_key):
+    print("Building active player queue")
+    players_to_move = []
+    player_keys = list(table.players.keys())
+
+    starting_player_index = player_keys.index(starting_player_key)
+
+    for player_index in range(len(table.players)):
+        current_index = (starting_player_index + player_index) % (len(table.players))
+        current_player_key = player_keys[current_index]
+        player = table.players[current_player_key]
+
+        print(f"Seat:{current_index}, folded:{player.folded}, raise:{player.total_bet}, current_raise:{table.current_raise} {'in' if not player.folded else 'out'}")
+        if not player.folded:
+            players_to_move.append( (current_player_key, player, current_index))
+    
+    return players_to_move
+
+def play_hand_v2(player_models):
+    table.apply_blind()
+    table.update_pot()
+    #since the player can't be faulted for losing money due to a blind
+    #starting money is collected after the blinds are applied
+    starting_money = {}
+
+    for player_key in table.players:
+        starting_money[player_key] = table.players[player_key].total_money
+
+    memory_buffers = [ReplayBuffer(8000) for _ in range(len(table.players))]
+    negative_memory_buffers = [ReplayBuffer(300) for _ in range(len(table.players))]
+    num_actions = [0 for _ in range(len(table.players))]
+
+
+    l.log("Starting New Hand: \n")
+    l.log("Starting Table Information: ")
+    l.log("Table Stage " + table.current_stage)
+    l.log("Starting Raise: " + str(table.current_raise))
+    l.log("Pot: " + str(table.pot))
+    l.log("Starting Player: " + str(table.get_starting_player()))
+
+    for player_key in table.players:
+        player = table.players[player_key]
+        l.log("Player" + str(player_key))
+        l.log("Folded: " + str(player.folded))
+        l.log("Raised: " + str(player.raised))
+        l.log("Checked: " + str(player.checked))
+        l.log("Money: " + str(player.total_money))
+        l.log("Bet: " + str(player.total_bet))
+
+    starting_player_key = table.get_starting_player()
+    break_case = False
+    pre_flop = True
+    pre_flop_passed = False
+    
+    while (table.current_stage != "pre-flop" or pre_flop) and not break_case:
+        pre_flop = False
+        print("Start of round: ", table.current_stage)
+        if table.current_stage == "flop":
+            print("Dealing")
+            table.deal()
+            pre_flop_passed = True
+
+        
+
+        player_move_queue = get_active_players(starting_player_key)
+        print("Number of active players: ", len(player_move_queue))
+        if len(player_move_queue) <= 1:
+            continue
+        
+        while player_move_queue and not break_case:
+            for player_key, player, network_index in player_move_queue:
+                print(network_index, end = " ")
+            print()
+            current_player_key, current_player, network_index = player_move_queue.pop(0)
+            print("Community Cards:")
+            table.print_comm_cards()
+            print("Current Raise: ", table.current_raise)
+
+            for player_key in table.players:
+                current_player_bet = table.players[player_key].total_bet
+                if table.players[player_key].folded:
+                    print("Folded", end = " ")
+                    continue
+                elif player_key == current_player_key:
+                    print("*", end="")
+                print(current_player_bet, end=" ")
+                    
+
+
+            table_state = table.get_state(current_player_key)
+            player_action = player_models[network_index].forward(table_state)
+
+            while not break_case:
+                if is_legal_action(player_action, current_player_key):
+                    action(current_player, player_action)    
+                    print("Action: ", player_action)
+                    new_state = table.get_state(current_player_key)
+
+                    
+                                        
+                    if current_player.folded:
+                        live_seats = sum([1 for p in table.players.values() if not p.folded])
+                        if live_seats <= 1:
+                            break_case = True
+
+                    elif current_player.raised:
+                        player_move_queue = get_active_players(current_player_key)
+                        starting_player_key = current_player_key
+                        if player_move_queue:
+                            player_move_queue.pop(0)
+
+
+                    mem = Memory(table_state, player_action, 0, new_state, False)
+                    memory_buffers[network_index].store_memory(mem)
+                    num_actions[network_index] += 1
+                    break
+
+                else:
+
+                    mem = Memory(table_state, player_action, -1.0, table_state, False)
+                    negative_memory_buffers[network_index].store_memory(mem)
+
+                    player_action = player_models[network_index].forward(table_state, epsilon=1.0)
+
+            if len(negative_memory_buffers[network_index]) > 50:
+                memories = negative_memory_buffers[network_index].sample(10)
+                player_models[network_index].batch_train_memories(memories)
+        print("End of betting round")
+        table.advance_stage()
+
+    print(table.current_stage, " ", pre_flop_passed)
+    if table.current_stage != "pre-flop" or not pre_flop_passed:
+        table.reset_hand()
+    print("\n\n****HAND OVER****\n\n")
+
+    
+    rewards = get_rewards(starting_money)
+
+    player_keys = list(rewards.keys())
+
+    gamma = 0.95
+    print(num_actions)
+    [exit(1) for num_act in num_actions if num_act == 0]
+    for player_key_index in range(len(player_keys)):
+        
+        player_key = player_keys[player_key_index]
+        player = table.players[player_key]
+        memory_buffer = memory_buffers[player_key_index]
+
+        for memory_ind in range(len(memory_buffer.buffer)):
+            memory = memory_buffer.buffer[memory_ind]
+            
+            #reward gets distributed with diminishing reward 
+            #across each move
+            memory.reward = rewards[player_key] * (gamma ** memory_ind)
+
+        if memory_buffer.buffer:
+            memory_buffer.buffer[-1].is_done = True
+            memory_buffer.merge_buffers(negative_memory_buffers[player_key_index])
+            
+    
+    return memory_buffers
+
 def play_hand(player_models):
     table.apply_blind()
     table.update_pot()
@@ -85,10 +254,28 @@ def play_hand(player_models):
 
     memory_buffers = [ReplayBuffer(8000) for _ in range(len(table.players))]
     negative_memory_buffers = [ReplayBuffer(300) for _ in range(len(table.players))]
+    num_actions = [0 for _ in range(len(table.players))]
 
     pre_flop = True # to ensure the current hand is the inital pre-flop
     break_case = False
     print(table.current_stage)
+
+    l.log("Starting New Hand: \n")
+    l.log("Starting Table Information: ")
+    l.log("Table Stage " + table.current_stage)
+    l.log("Starting Raise: " + str(table.current_raise))
+    l.log("Pot: " + str(table.pot))
+    l.log("Starting Player: " + str(table.get_starting_player()))
+
+    for player_key in table.players:
+        player = table.players[player_key]
+        l.log("Player" + str(player_key))
+        l.log("Folded: " + str(player.folded))
+        l.log("Raised: " + str(player.raised))
+        l.log("Checked: " + str(player.checked))
+        l.log("Money: " + str(player.total_money))
+        l.log("Bet: " + str(player.total_bet))
+
     
     while (table.current_stage != "pre-flop" or pre_flop) and not break_case:
         print(table.current_stage)
@@ -101,8 +288,10 @@ def play_hand(player_models):
         i = 0
         #iterate over the length of the players.
         #if a player raises, shift round_end_ind to the current index and then
-        #reset i to 0
+        #reset i to 1(the next player)
+
         while i < len(player_models):
+            print("Index = ", i)
             current_player_index = (round_end_ind + i) % len(player_models)
             current_player_key = player_key_list[current_player_index]
             current_player = table.players[current_player_key]
@@ -115,6 +304,7 @@ def play_hand(player_models):
             #check if there is only one active player they win
             active_players = [p_key for p_key, p in table.players.items() if not p.folded]
             if len(active_players) != 1:
+                #if there are any active players
                 print("Current Pot: ", table.pot)
                 print("Current Raise Amount", table.current_raise)
                 print("Player: ", current_player_index)
@@ -143,15 +333,16 @@ def play_hand(player_models):
                         print(player_action)
                         action(table.players[current_player_key], player_action)
                         new_state = table.get_state(current_player_key)
-                        if player_action < 7 and player_action >= 0:
-                            i = 0
-                            round_end_ind = current_player_index + 1
+                        if player.raised:
+                            i = 1
+                            round_end_ind = current_player_index
                         else:
                             i+=1
                         mem = Memory(table_state, player_action, 0, new_state, False)
                         #reward will only be assigned after the hand is done
                         #if the player wins, then all memories stored will be 
                         memory_buffers[current_player_index].store_memory(mem)
+                        num_actions[current_player_index] += 1
                         break
                     else:
                         mem = Memory(table_state, player_action, -1.0, table_state, False)
@@ -162,23 +353,24 @@ def play_hand(player_models):
                     memories = negative_memory_buffers[current_player_index].sample(10)
                     player_models[current_player_index].batch_train_memories(memories)
             else:
+                print("Break case is true")
                 break_case = True
                 break
         if not break_case:
             table.advance_stage()
 
+    print("\n\n****HAND OVER****\n\n")
     for pk in table.players:
         print(table.players[pk].folded, table.current_stage)
 
-    if table.current_stage != "pre-flop":# catch case if the hand ended before a reset
-        table.reset_hand()
+    table.reset_hand()
 
     rewards = get_rewards(starting_money)
 
     player_keys = list(rewards.keys())
 
     gamma = 0.95
-
+    print(num_actions)
     for player_key_index in range(len(player_keys)):
         
         player_key = player_keys[player_key_index]
@@ -194,8 +386,9 @@ def play_hand(player_models):
 
         if memory_buffer.buffer:
             memory_buffer.buffer[-1].is_done = True
-            memory_buffer.merge_percentage_of_self(negative_memory_buffers[player_key_index], 0.05)
-
+            memory_buffer.merge_buffers(negative_memory_buffers[player_key_index])
+            
+    
     return memory_buffers
 
 
@@ -229,7 +422,7 @@ def get_rewards(starting_money:dict):
 
 
 if __name__ == "__main__":
-    num_players = 3
+    num_players = 8
 
     # State encoding:
     # 52 one-hot for hole cards
@@ -250,7 +443,7 @@ if __name__ == "__main__":
 
     num_outputs = 10
 
-    num_episodes = 100
+    num_episodes = 10000
 
     player_networks = []
 
@@ -259,6 +452,7 @@ if __name__ == "__main__":
 
     build_table(num_players)
 
+    cumulative_memories = [ReplayBuffer(5000) for _ in range(num_players)]
     #enerates all the networks
     for _ in range(num_players):
         network = simple_dqn(num_state_variables, num_outputs)
@@ -266,12 +460,21 @@ if __name__ == "__main__":
 
     for eps in range(num_episodes):
         starting_money = [player.total_money for player in table.players.values()]
-        memory_buffers = play_hand(player_networks)
-
+        memory_buffers = play_hand_v2(player_networks)
+        
         for network_index in range(len(player_networks)):
-            sample_size = min(100, len(memory_buffers[network_index]))
-            memories = memory_buffers[network_index].sample(sample_size)
+            
+            #folds the old memories into the new memories for training
+            new_mem_sample_size = min(10, len(memory_buffers[network_index]))
+            old_mem_sample_size = min(100, len(cumulative_memories[network_index]))
+            
+            memories = memory_buffers[network_index].sample(new_mem_sample_size)
+            memories += cumulative_memories[network_index].sample(old_mem_sample_size)
+
+            #grabs all the memories from the old hand
+
             player_networks[network_index].batch_train_memories(memories)
+            cumulative_memories[network_index].merge_buffers(memory_buffers[network_index])
 
         #resets each player
         for index, key in enumerate(table.players):

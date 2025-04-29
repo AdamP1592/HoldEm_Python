@@ -1,7 +1,5 @@
 import random
 from game.Card import Card
-from game.Logger import Logger
-
 class Deck:
     def __init__(self, num_decks):
         self.suit_chars = ['\u2660', '\u2665', '\u2666', '\u2663']
@@ -40,12 +38,9 @@ class Deck:
         random.shuffle(self.cards)
 
     def deal_card(self):
-        l = Logger()
-        l.log("Card being delt: ", end="")
         if not self.cards:
             raise Exception("No cards left in the deck.")
         card = self.cards.pop()
-        l.log(str(card))
         self.size -= 1
         return card
 

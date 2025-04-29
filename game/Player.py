@@ -1,3 +1,4 @@
+from game.Logger import Logger
 class Player:
     def __init__(self):
         self.hand = None
@@ -10,6 +11,7 @@ class Player:
 
         self.raise_applied = True
 
+        self.logger = Logger()
     
 
     def set_hand(self, h):
@@ -45,6 +47,8 @@ class Player:
 
     def fold(self):
         self.folded = True
+        self.raised = False
+        self.checked = False
 
     def call(self, amount):
         #amount is the total amount a player has bet in order to match
@@ -76,6 +80,7 @@ class Player:
         self.raised = False
 
     def reset(self):
+        self.logger.log("Resetting Player")
         cards_in_hand = None
         if self.hand:
             cards_in_hand = [card for card in self.hand.get_cards()] # shallow copy, but not just reference to list

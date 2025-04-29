@@ -16,7 +16,7 @@ class HoldEm:
         self.community_cards = [None] * 5
         self.community_cards_index = 0
 
-        self.logger = Logger(reset=True)
+        self.logger = Logger(reset=False)
 
         self.last_winners = {}
 
@@ -105,9 +105,16 @@ class HoldEm:
     def distribute_pot(self):
         player_hands = {}
         num_players_still_in = 0
+
+        self.logger.log("Distributing Pot: ")
+        self.logger.log("Players Still Playing: ")
+
         for player_key in self.players:
             self.last_winners[player_key] = 0
             if not self.players[player_key].folded:
+                
+                self.logger.log(str(player_key))
+
                 num_players_still_in +=1
                 player_hand = self.players[player_key].get_hand()
                 #catch case for a pre-flop win
@@ -117,12 +124,19 @@ class HoldEm:
                     player_hands[player_key] = None
 
         if num_players_still_in == 1:
+            self.logger.log("Only one player still in the game.")
+
             keys = list(self.players.keys())
             player_key = keys[0]
             self.players[player_key].total_money += self.pot
             self.players[player_key].total_bet = 0
             return
-        
+
+        self.logger.log("Cards still in hole: " )
+        for card in self.community_cards:
+            self.logger.log("\t" + str(card))
+
+        #if there is more than 1 winner, that means the hand was concluded
         hand_ranks = rank_players(self.community_cards, player_hands)
         for ranked_player_list in hand_ranks:
 
@@ -168,7 +182,6 @@ class HoldEm:
         self.distribute_pot()
         #return each card from hands
 
-        self.logger.log("Num Cards: " + str(len(self.deck.cards)))
         self.logger.log("Deck: " + str(self.deck))
 
         self.logger.log("Returning Cards: ")

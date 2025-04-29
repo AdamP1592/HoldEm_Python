@@ -1,4 +1,6 @@
 from Game import *
+from dqn.ReplayBuffer import ReplayBuffer
+from dqn.Memory import Memory
 def test_hand():
     num_players = 4
     build_table(num_players)
@@ -132,3 +134,9 @@ def test_state():
 
         print(state)
         print(len(state))
+
+def test_memory_buffer():
+    buff1 = ReplayBuffer(100)
+    buff2 = ReplayBuffer(10)
+    for i in range(50):
+        pass

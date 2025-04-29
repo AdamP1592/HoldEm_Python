@@ -133,7 +133,7 @@ class Table:
     def reset_hand(self):
         self.current_stage = "pre-flop"
         self.game.community_cards_index = 0
-
+        self.current_raise = 50
         self.rotate_blinds()
         self.blind_applied = False
         print("Resetting")
@@ -178,16 +178,17 @@ class Table:
 
     def advance_stage(self):
         
+        stage_keys = list(self.stages.keys())
+        ind = stage_keys.index(self.current_stage)
+
         for player_key in self.players:
             self.players[player_key].next_turn()
             
         self.stages[self.current_stage]()
 
         self.current_raise = 0
-        stageKeys = list(self.stages.keys())
-        ind = stageKeys.index(self.current_stage)
-
-        self.current_stage = stageKeys[(ind + 1) % len(stageKeys)]
+        
+        self.current_stage = stage_keys[(ind + 1) % len(stage_keys)]
     
     def print_comm_cards(self):
         for card in self.community_cards:
