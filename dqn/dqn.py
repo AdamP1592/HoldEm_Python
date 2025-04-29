@@ -69,12 +69,12 @@ class DQN():
 
         gradients = tape.gradient(loss, self.model.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
-        if self.num_memories_trained > 500:
-            self.num_memories_trained = 0
-            self.copy_main_to_target()
 
         return float(tf.reduce_mean(loss))
     def batch_train_memories(self, memory_sample: list[Memory]) -> float:
+
+
+        ## here 
         states = np.array([mem.state for mem in memory_sample], dtype=np.float32)
         actions = np.array([mem.action for mem in memory_sample], dtype=np.int32)
         next_states = np.array([mem.next_state for mem in memory_sample], dtype=np.float32)
@@ -84,13 +84,19 @@ class DQN():
         self.num_memories_trained += len(memory_sample)
 
     # Now convert to tensors (only once)
-        return self.batch_train(
+        loss =  self.batch_train(
             tf.constant(states),
             tf.constant(actions),
             tf.constant(rewards),
             tf.constant(next_states),
             tf.constant(dones)
         )
+        ## here
+        if self.num_memories_trained > 500:
+            self.num_memories_trained = 0
+            self.copy_main_to_target()
+
+        return loss
 
     def forward(self, state, epsilon = 0.1) -> int:
         if random.random() < epsilon:

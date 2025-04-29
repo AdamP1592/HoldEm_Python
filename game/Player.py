@@ -90,4 +90,9 @@ class Player:
         self.hand = None
         return cards_in_hand
     def print_hand(self):
-        print(self.hand.to_true_string())
+        print()
+        if self.hand:
+            print("Cards: ", end =" ")
+            for card in self.hand.get_cards():
+                print(card, end = "")
+            print()
