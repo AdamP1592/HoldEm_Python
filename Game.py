@@ -6,6 +6,8 @@ from dqn import *
 from GameTests import *
 
 import random
+import math
+import keyboard
 
 l = Logger(reset=True)
 Logger.is_logging = False
@@ -13,7 +15,7 @@ Logger.is_logging = False
 table = Table()
 players = []
 
-base_reward_weights = {"win": 1, "fold": 1}
+base_reward_weights = {"win": 1, "fold": 1, "bust": 1, "money gained": 1}
 
 reward_weights = {}
 
@@ -29,7 +31,7 @@ table_rewards = {}
 # number of active players(numActive/totalPlayers) (8)
 # betting round
 
-raise_sizes = [0.01, 0.05, 0.2, 0.4, 0.5, 0.75, 1.0]
+raise_sizes = [0.01, 0.05, 0.1, 0.2, 0.5, 0.75, 1.0]
 
 def action(player, action:int):
     #action = some int between 0 and 9
@@ -45,8 +47,16 @@ def action(player, action:int):
             player.call(table.current_raise)
             table.update_pot()
         case _:
-            player.raise_(raise_amounts[action] + table.current_raise)
+
+            raise_amount = raise_amounts[action] + table.current_raise
+            player_money = player.total_money
+            player.raise_(raise_amount)
+                        
             table.update_pot()
+            #if it's an all in, set the current_raise to that amount
+            if player_money <= raise_amount:
+                table.current_raise = raise_amount
+
 
 def build_table(numPlayers:int):
     global table
@@ -112,8 +122,8 @@ def play_hand_v2(player_models):
     table.update_pot()
     table.deal()
     
-    memory_buffers = [ReplayBuffer(8000) for _ in range(len(table.players))]
-    negative_memory_buffers = [ReplayBuffer(300) for _ in range(len(table.players))]
+    memory_buffers = [ReplayBuffer(500) for _ in range(len(table.players))]
+    negative_memory_buffers = [ReplayBuffer(100) for _ in range(len(table.players))]
     num_actions = [0 for _ in range(len(table.players))]
 
 
@@ -137,7 +147,11 @@ def play_hand_v2(player_models):
     break_case = False
     pre_flop = True
     pre_flop_passed = False
-    
+
+    folded_players = {}
+    for player_key in table.players:
+        folded_players[player_key] = False
+
     while (table.current_stage != "pre-flop" or pre_flop) and not break_case:
         pre_flop = False
         print("Start of round: ", table.current_stage)
@@ -188,6 +202,7 @@ def play_hand_v2(player_models):
                     new_state = table.get_state(current_player_key)
                                         
                     if current_player.folded:
+                        folded_players[current_player_key] = True
                         live_seats = sum([1 for p in table.players.values() if not p.folded])
                         if live_seats <= 1:
                             break_case = True
@@ -217,13 +232,15 @@ def play_hand_v2(player_models):
         print("End of betting round")
         table.advance_stage()
 
+
+
     print(table.current_stage, " ", pre_flop_passed)
     if table.current_stage != "pre-flop" or not pre_flop_passed:
         table.reset_hand()
     print("\n\n****HAND OVER****\n\n")
 
     
-    rewards = get_rewards_with_weights(starting_money)
+    rewards = get_rewards_with_weights(starting_money, folded_players)
 
     player_keys = list(rewards.keys())
 
@@ -247,52 +264,58 @@ def play_hand_v2(player_models):
             memory_buffer.merge_buffers(negative_memory_buffers[player_key_index])
             
     
-    return memory_buffers
+    return (memory_buffers, folded_players)
+def interpolate_reward(min_reward, max_reward, raw_reward):
+    if abs(max_reward - min_reward) < 1e-6:
+        return 0.0
+    return ((raw_reward - min_reward) / (max_reward - min_reward) * 2) - 1
 
-def get_rewards(starting_money:dict):
 
-    prev_winners = table.get_prev_winner() # those that won
-    rewards = {}
-
-    percent_change_in_money = {}
-
-    for player_key in table.players:
-        #amount won relative to the base hand size
-        percent_change = (table.players[player_key].total_money - starting_money[player_key]) / (starting_money[player_key])
-        # win amount takes up half the weight. Whether or not the player gained any money at all takes up the other half
-        rewards[player_key] = (percent_change * 0.1) + (0.75 * ( 2 * ( int(percent_change > 0)) - 1 ) ) 
-        #punishment for folding
-        rewards[player_key] += int(table.players[player_key].folded) * -0.1
-        percent_change_in_money[player_key] = percent_change
-    #normalizes reward to (-1.0, 1.0)
-    max_reward = max(abs(x) for x in rewards.values())
-    for player_key in rewards:
-        rewards[player_key] /= max_reward
-    print(rewards)
-    return rewards
-
-def get_rewards_with_weights(starting_money:dict):
+def get_rewards_with_weights(starting_money:dict, folded_players:dict):
     rewards = {}
     percent_change_in_money = {}
     
-    
+    # Rewards:
+    # Player gained money
+    # The percent change in money
+    # The player bust
+    # The player folded
+
     for player_key in table.players:
+
+
         target_reward_weights = reward_weights[player_key]
+
+        print("Total Money: ", table.players[player_key].total_money, "Folded: ", folded_players[player_key])
+        print("Weights: ", target_reward_weights)
 
         win_weight = target_reward_weights[0]
         fold_weight = target_reward_weights[1]
+        bust_weight = target_reward_weights[2]
+        money_gained_weight = target_reward_weights[3]
         #amount won relative to the base hand size
         percent_change = (table.players[player_key].total_money - starting_money[player_key]) / (starting_money[player_key])
-        # win amount takes up half the weight. Whether or not the player gained any money at all takes up the other half
-        rewards[player_key] = (percent_change * (1 - win_weight)) + (win_weight * ( 2 * ( int(percent_change > 0)) - 1 ) ) 
-        #punishment for folding
-        rewards[player_key] += int(table.players[player_key].folded) * (- fold_weight)
+
+        #clips the percent change for overwhelming victories because that skews every players reward too far
+        if percent_change > 1:
+            percent_change = 1.0 + 0.25 * math.tanh((percent_change - 1.0) * 2)
+
+        win_reward = (win_weight * ( int(percent_change > 0)) ) 
+        percent_change_reward = (percent_change * money_gained_weight) 
+        fold_punishment = int(folded_players[player_key]) * (- fold_weight)
+        bust_punishment = - bust_weight * int(table.players[player_key].total_money == 0)
+
+        raw_reward = win_reward + percent_change_reward + fold_punishment + bust_punishment
+        max_possible_reward = (1.25 * money_gained_weight) + win_weight
+        min_possible_reward = - (money_gained_weight + fold_weight + bust_weight)
+        reward = interpolate_reward(min_possible_reward, max_possible_reward, raw_reward)
+        assert -1.0 <= reward <= 1.0, f"reward out of bounds: {reward}"
+        rewards[player_key] = reward
         percent_change_in_money[player_key] = percent_change
+        print(f"Total Reward: {rewards[player_key]}, Win Reward: {win_reward}, Percent change in money reward: {percent_change_reward}, Fold Punishment: {fold_punishment}, Bust Punishment: {bust_punishment}")
     #normalizes reward to (-1.0, 1.0)
-    max_reward = max(abs(x) for x in rewards.values())
-    for player_key in rewards:
-        rewards[player_key] /= max_reward
     print(rewards)
+    
 
     return rewards
 
@@ -340,7 +363,7 @@ def update_low_performers(sorted_losses):
         reward_weights[key] = new_weights[offset]# 0, 1, 2, 3
 
     for player_key in sorted_losses:
-        print(f"Player: {player_key}, Loss Count: {num_losses[player_key]}")
+        print(f"Player: {player_key}, Loss Count: {failures[player_key]}")
 
 if __name__ == "__main__":
     num_players = 8
@@ -364,23 +387,28 @@ if __name__ == "__main__":
 
     num_outputs = 10
 
-    num_episodes = 5000
+    num_episodes = 1000
 
     num_generations = 20
+
+    base_money = 5000
 
     player_networks = []
 
 
-    num_losses = {}
+    failures = {}
 
     build_table(num_players)
 
 
     for player_key in table.players:
-        win_weight = random.random()
-        fold_weight = random.random()
-        reward_weights[player_key] = [win_weight, fold_weight]
-        num_losses[player_key] = 0
+        reward_weights[player_key] = []
+        for _ in range(len(base_reward_weights)):
+            weight = random.random()
+            reward_weights[player_key].append(weight)
+
+        table.players[player_key].total_money = base_money
+        failures[player_key] = 0
     print(reward_weights)
 
     #enerates all the networks
@@ -393,11 +421,15 @@ if __name__ == "__main__":
 
         for net in player_networks:
             net.reset()
-        cumulative_memories = [ReplayBuffer(8000) for _ in range(num_players)]
+        cumulative_memories = [ReplayBuffer(4000) for _ in range(num_players)]
 
         for eps in range(num_episodes):
-            starting_money = [player.total_money for player in table.players.values()]
-            memory_buffers = play_hand_v2(player_networks)
+            if keyboard.is_pressed('p'):
+                input("Paused. Press Enter to resume.")
+            starting_money = {}
+            for key in table.players:
+                starting_money[key] = table.players[key].total_money 
+            memory_buffers, folded_players = play_hand_v2(player_networks)
             
             for network_index in range(len(player_networks)):
                 
@@ -405,35 +437,44 @@ if __name__ == "__main__":
                 new_mem_sample_size = min(10, len(memory_buffers[network_index]))
                 old_mem_sample_size = min(100, len(cumulative_memories[network_index]))
                 
-                memories = memory_buffers[network_index].sample(new_mem_sample_size)
-                memories += cumulative_memories[network_index].sample(old_mem_sample_size)
+                memories = (memory_buffers[network_index].sample(new_mem_sample_size) + 
+                            cumulative_memories[network_index].sample(old_mem_sample_size))
                 
 
                 #grabs all the memories from the old hand
-                if len(memories) > 1:
+                if len(memories) > 0:
                     player_networks[network_index].batch_train_memories(memories)
                     cumulative_memories[network_index].merge_buffers(memory_buffers[network_index])
 
-            #resets each player
+            #resets each player and builds out failure dict
             for index, key in enumerate(table.players):
                 player = table.players[key]
-                starting_balance = starting_money[index]
+                starting_balance = starting_money[key]
 
+                #double failure if the player runs out of money
                 if player.total_money <= starting_balance:
-                    num_losses[key] += 1
+                    failures[key] += 1
 
-                player.total_money = 5000
-            
-            print(table.game.deck.size)
-        next_weights = {}
+                #resets player money if they win or bust
+                if player.total_money == 0:
+                    failures[key] += 1
+                    player.total_money = base_money
+
+                if player.total_money > base_money * 1.5:
+                    player.total_money *= 0.7
+
+            for key in folded_players:
+                if folded_players[key]:
+                    failures[key] += 0.1
+
 
         #top 2 make 2 children
         #next 2 make 2 children
 
-        sorted_losses = {k: v for k, v in sorted(num_losses.items(), key=lambda item: item[1])}
+        sorted_losses = {k: v for k, v in sorted(failures.items(), key=lambda item: item[1])}
         update_low_performers(sorted_losses)
                 
-        for key in num_losses:
-            num_losses[key] = 0
+        for key in failures:
+            failures[key] = 0
 
     print("EOF")

@@ -86,4 +86,9 @@ This class drives the core game progression.
         - win_weight: dictates the reward for winning the hand and the reward for the amount won for the hand
         - fold_weight: dictates the penalty for folding
 
+### Future Work
 
+- Multi-network approach per generation:
+    - Every generation's rewards are ran through several networks to confirm generalization of reward scheme applies to every possible network
+
+- Decay scheduling for learning rate an epsilon
