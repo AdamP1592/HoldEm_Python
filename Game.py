@@ -364,7 +364,7 @@ if __name__ == "__main__":
 
     num_outputs = 10
 
-    num_episodes = 1000
+    num_episodes = 5000
 
     num_generations = 20
 
@@ -374,8 +374,6 @@ if __name__ == "__main__":
     num_losses = {}
 
     build_table(num_players)
-
-    cumulative_memories = [ReplayBuffer(8000) for _ in range(num_players)]
 
 
     for player_key in table.players:
@@ -388,13 +386,14 @@ if __name__ == "__main__":
     #enerates all the networks
     
     for _ in range(num_players):
-        network = simple_dqn(num_state_variables, num_outputs)
+        network = simple_dqn(num_state_variables, num_outputs, num_episodes = num_episodes)
         player_networks.append(network)
 
     for gen in range(num_generations):
 
         for net in player_networks:
             net.reset()
+        cumulative_memories = [ReplayBuffer(8000) for _ in range(num_players)]
 
         for eps in range(num_episodes):
             starting_money = [player.total_money for player in table.players.values()]
@@ -420,7 +419,7 @@ if __name__ == "__main__":
                 player = table.players[key]
                 starting_balance = starting_money[index]
 
-                if player.total_money < starting_balance:
+                if player.total_money <= starting_balance:
                     num_losses[key] += 1
 
                 player.total_money = 5000
@@ -436,3 +435,5 @@ if __name__ == "__main__":
                 
         for key in num_losses:
             num_losses[key] = 0
+
+    print("EOF")

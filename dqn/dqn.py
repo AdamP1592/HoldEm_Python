@@ -5,17 +5,15 @@ from .Memory import Memory
 
 import random
 class DQN():
-    def __init__(self, network_structure):
+    def __init__(self, network_structure, num_episodes = -1):
         self.network_structure = network_structure[:]
-
-        self.optimizer = tf.keras.optimizers.Adam()
-        self.loss_fn = tf.keras.losses.Huber()
 
         self.metrics = ['mae']
         self.gamma = 0.99
         self.num_actions = network_structure[-1] - 1
 
         self.num_memories_trained = 0
+        self.episode_count = 0
         
         self.build_model(network_structure)
 
@@ -33,15 +31,28 @@ class DQN():
 
         layers = self.get_layers(network_structure)
         self.model = tf.keras.Sequential(layers)
+        self.model.build(input_shape=(None, network_structure[0]))
 
         layers = self.get_layers(network_structure)
         self.target_model = tf.keras.Sequential(layers)
+        self.target_model.build(input_shape=(None, network_structure[0]))
         
+        #WRAPPED FUNCTION
+        self.batch_train = tf.function(self.unwrapped_batch_train)
+
         self.copy_main_to_target()
+        self.optimizer = tf.keras.optimizers.Adam()
+        self.loss_fn = tf.keras.losses.Huber()
+
+        if self.num_episodes != -1:
+            #add decay
+            pass
+    
 
     def reset(self):
         self.build_model(self.network_structure)
         self.num_memories_trained = 0
+        self.episode_count = 0
 
     def calc_qs(self, outputs):
         advantages = outputs[:, :-1]
@@ -55,9 +66,8 @@ class DQN():
     def get_model_output(self, state):
         outputs = self.model(state)
         return self.calc_qs(outputs)
-        
-    @tf.function
-    def batch_train(self, states:tf.Tensor, actions:tf.Tensor, rewards:tf.Tensor, next_states:tf.Tensor, dones:tf.Tensor) -> float:
+    
+    def unwrapped_batch_train(self, states:tf.Tensor, actions:tf.Tensor, rewards:tf.Tensor, next_states:tf.Tensor, dones:tf.Tensor) -> float:
         with tf.GradientTape() as tape:
             #main state
             outputs = self.model(states)
@@ -89,6 +99,7 @@ class DQN():
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
         return float(tf.reduce_mean(loss))
+
     def batch_train_memories(self, memory_sample: list[Memory]) -> float:
 
 
@@ -100,6 +111,7 @@ class DQN():
         dones = np.array([float(mem.is_done) for mem in memory_sample], dtype=np.float32)
         
         self.num_memories_trained += len(memory_sample)
+        self.episode_count += 1
 
     # Now convert to tensors (only once)
         loss =  self.batch_train(
