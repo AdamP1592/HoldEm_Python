@@ -1,98 +1,121 @@
-# Genetic Reward-Shaped Dueling Dobule Deep Q-Network
+# Genetic Reward-Shaped Dueling Double Deep Q-Network (G-D3QN)
 
+## Overview
 
-## Project Summary
+This project implements a reinforcement learning system for Texas Hold'em poker agents using a **generational genetic algorithm** that evolves **reward shaping vectors** rather than policies. It combines Dueling Double DQNs, a genetic strategy for optimizing reward weights, and environment-specific constraints designed for multi-agent competitive learning.
 
-A reinforcement learning framework for training poker-playing agents using a Generational Genetic Evolution strategy that evolves reward functions rather than policies. The system employs Dueling Double Deep Q-Networks with Huber loss, Adam optimization, and retroactive reward shaping to promote the discovery of robust, generalizable reward strategies across fresh network instantiations.
+Agents are trained over **generations** using freshly initialized Dueling Double Deep Q-Networks. After each generation, networks are **discarded**, and only the **reward weight vectors** are evolved based on agent performance.
 
+---
 
-**Recommended minimum DRAM to run the training loop**: 16 gb. If you train with less ram, reduce the replay buffer, cumulative replay buffer size, and network size. The current version takes somewhere between 8 and 10 gigs(about 1 gig per network) due to the memory storage and tensorflow graph storage due to calling tf.function() on the unwrapped training loop. E
+## Requirements
 
-## Network
+- Python 3.11 (minimum)
+- TensorFlow 2.x
+- NumPy
 
-This project implements a Generational Genetic Evolutionary Deep Reinforcement Learning framework for optimizing agent behavior in a competitive card game environment that primarly leverages TensorFlow's underlying framework and Numpy.
-Rather than directly evolving neural network weights, the algorithm evolves reward shaping strategies over generations, ensuring fair competition and reducing momentum bias.
+**Memory warning**: Full training consumes **8–10 GB RAM**. If using lower-spec hardware:
+- Reduce network width/depth
+- Decrease replay buffer sizes
+- Swap from using tf.function in the dqn file to just the unwrapped function. Will yield slower training but will save a lot of ram
 
-At the beginning of each generation, a fresh population of neural networks is initialized.
-Each network is trained over many episodes using a Dueling Double DQN architecture, leveraging Huber loss for stable learning and Adam optimization for adaptive gradient descent.
+---
 
-After all episodes in a generation:
+## Key Features
 
-- Player performance is ranked based on a cumulative loss metric (e.g., number of hands lost).
+### Genetic Evolution of Reward Weights
+- Each player has a **4-element reward weight vector** for:
+  1. Win bonus
+  2. Fold penalty
+  3. Bust penalty
+  4. Money gained multiplier
+- Top-performing agents pass **mutated** versions of their reward vectors to weaker agents each generation.
 
-- Top performers' reward strategies are averaged and mutated slightly to create new reward schemes.
+### Dueling Double DQN Agents
+- Each network outputs **advantage and value** streams, combined into Q-values.
+- Uses:
+  - **Huber Loss** for stability
+  - **Adam optimizer**
+  - **Target networks**
+  - **Epsilon-greedy exploration**
 
-- Lowest-performing players adopt these new mutated reward functions.
+### Retroactive Reward Shaping
+- Rewards are assigned **after a hand ends**, not per-step.
+- Each memory receives a **discounted reward** using a temporal decay (`γ`).
+- Folding results in an immediate penalty.
+- Winning/loss rewards are scaled relative to **money delta**.
 
-- Neural networks are reset (fresh randomized weights) for the next generation, ensuring no cross-generation bias.
+### Memory and Replay Buffer Design
+- Each agent has:
+  - A **short-term buffer** (per hand)
+  - A **cumulative buffer** (per generation)
+- Experiences are sampled from both during training.
+- Negative experiences (e.g., illegal actions) are stored and trained on as needed.
 
-Replay buffers accumulate experience within a generation and are flushed between generations to prevent stale learning across resets.
-A retroactive reward adjustment scheme is used during training, where the reward is distributed backward across actions, discounted by the timestep.
+---
 
-The system promotes the discovery of robust reward shaping strategies that generalize across networks rather than overfitting to a specific training history.
+## Architecture Summary
 
-## HoldEm
+| Component       | Description                                                                 |
+|----------------|-----------------------------------------------------------------------------|
+| `Table`         | Orchestrates the game loop, betting rounds, and shared state              |
+| `Player`        | Encodes player money, hand, actions, and training state                   |
+| `HoldEm`        | Poker engine: card dealing, pot handling, winner determination            |
+| `HandRanker`    | Computes full hand rankings from community + hole cards                   |
+| `DQN`           | Dueling Double DQN with custom training and action selection              |
+| `ReplayBuffer`  | Experience memory with `sample()` and `merge_buffers()` methods           |
 
-### Core Compnents:
+---
 
-#### Card:
+## Training Flow
 
-Encodes suit, face value, and optional high-value (e.g., Ace as 14). Each card includes a normalized ID for one-hot encoding.
+1. **Initialize**: Random reward vectors + new Dueling DQNs for each player.
+2. For each generation:
+   - Train all agents for `N` episodes (hands).
+   - Score agents based on:
+     - Hands lost
+     - Fold frequency
+     - Busts
+   - Generate new reward vectors:
+     - Top 2 → mutate → overwrite bottom 4
+     - Middle 2 → mutate → overwrite next 2
+   - Store all updated models and reward vectors.
 
-#### Deck:
+---
 
-Supports multiple decks, random shuffling, card dealing, and recycling.
+## Game Design Notes
 
-#### Hand:
+- **State Encoding** includes:
+  - One-hot card encodings (52 for hole, 52 for community)
+  - Pot, current raise, player money, betting stage (one-hot)
+  - For each other player: fold flag, raise amount, total bet
 
-Encapsulates a player’s hole cards. Includes utilities to hide/show cards, print hands, and compute temporary values.
+- **Action Space (10 actions)**:
+  - 0–6: different raise sizes (relative % of stack)
+  - 7: call
+  - 8: check
+  - 9: fold
 
-#### Player:
+- **Legal actions** are filtered, and illegal moves trigger a negative reward + re-sample.
 
-- Current hand, total money, total bet, and raise amount
-- Action Methods: call(), raise_(), check(), and fold()
-- reset() is called at the end of a hand to reset everything
-- next_turn() is called at the end of a betting round
+---
 
-#### HandRanker
+## Future Improvements
 
-- rank_players(...) takes in a list of the community cards(cards in the hole) and a dict of {player_key: hand_object}. returns full poker hand ranks.
+- Add epsilon decay during training
+- Add multi-table parallel generation evolution (cross-table gene mixing)
+- Normalize model evaluation across more networks
+- Build human-vs-model demo interface
 
-#### Table
+---
 
-This is an interface with the core game mechanics class HoldEm and RL interface with the game.
-- Initalizes players.
-- Defines betting stages.
-- Rotates blinds, tracks current raise, and encodes game state for each agent.
+## Notes
 
-#### HoldEm
+This system was built under **hardware constraints** on a 6-year-old laptop with 16 GB RAM. Despite that, it successfully demonstrates:
+- A full RL-based Hold'em engine
+- Reward vector evolution
+- Independent Q-networks competing via shared environment
 
-This class drives the core game progression.
-- Manages community cards, pot, and players
-- Computes winners
-- interfaces with HandRanker
+The framework can be scaled horizontally with more compute (parallel training, threading, larger buffers) or extended with more sophisticated learning heuristics.
 
-### Main File
-
-- Manages game loop.
-- Initalizes N players(agents) each with a fresh Dueling Double DQN and Memory Buffer
-- For each **generation**:
-    - Networks are reset
-    - Agents are trained over multiple episodes where each episode is a full poker hand
-    - Cumulative Memory Buffer: Stores memories over every hand in a generation
-- After training:
-    - Players are ranked by performance
-    - Poor performers reward vectors are replaced with mutated high performer reward vectors
-    - Networks are reset
-- Rewards are:
-    - Shaped by two weights that apply to three rewards: 
-        - win_weight: dictates the reward for winning the hand and the reward for the amount won for the hand
-        - fold_weight: dictates the penalty for folding
-
-### Future Work
-
-- Multi-network approach per generation:
-    - Every generation's rewards are ran through several networks to confirm generalization of reward scheme applies to every possible network
-
-- Decay scheduling for learning rate an epsilon
-- Refine dram usage for efficiency
+---
