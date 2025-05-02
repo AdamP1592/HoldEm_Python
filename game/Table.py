@@ -121,6 +121,8 @@ class Table:
 
             self.blind_applied = True
 
+        self.current_raise = self.big_blind
+
     def rotate_blinds(self):
         player_keys = list(self.players.keys())
         for key_ind in range(len(player_keys)):

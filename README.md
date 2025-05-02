@@ -5,6 +5,9 @@
 
 A reinforcement learning framework for training poker-playing agents using a Generational Genetic Evolution strategy that evolves reward functions rather than policies. The system employs Dueling Double Deep Q-Networks with Huber loss, Adam optimization, and retroactive reward shaping to promote the discovery of robust, generalizable reward strategies across fresh network instantiations.
 
+
+**Recommended minimum DRAM to run the training loop**: 16 gb. If you train with less ram, reduce the replay buffer, cumulative replay buffer size, and network size. The current version takes somewhere between 8 and 10 gigs(about 1 gig per network) due to the memory storage and tensorflow graph storage due to calling tf.function() on the unwrapped training loop. E
+
 ## Network
 
 This project implements a Generational Genetic Evolutionary Deep Reinforcement Learning framework for optimizing agent behavior in a competitive card game environment that primarly leverages TensorFlow's underlying framework and Numpy.
@@ -92,3 +95,4 @@ This class drives the core game progression.
     - Every generation's rewards are ran through several networks to confirm generalization of reward scheme applies to every possible network
 
 - Decay scheduling for learning rate an epsilon
+- Refine dram usage for efficiency

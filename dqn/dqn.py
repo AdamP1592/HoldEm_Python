@@ -3,7 +3,7 @@ import numpy as np
 
 from .Memory import Memory
 
-import random
+import random, os, ast
 class DQN():
     def __init__(self, network_structure, num_episodes = -1):
         self.network_structure = network_structure[:]
@@ -43,12 +43,14 @@ class DQN():
         self.batch_train = tf.function(self.unwrapped_batch_train)
 
         self.copy_main_to_target()
-        self.optimizer = tf.keras.optimizers.Adam()
-        self.loss_fn = tf.keras.losses.Huber()
 
         if self.num_episodes != -1:
-            #add decay
-            pass
+            self.generate_lr_schedule()
+        
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate = self.lr_schedule)
+        self.loss_fn = tf.keras.losses.Huber()
+
+
     
 
     def reset(self):
@@ -68,6 +70,19 @@ class DQN():
     def get_model_output(self, state):
         outputs = self.model(state)
         return self.calc_qs(outputs)
+    
+    def generate_lr_schedule(self):
+        default_learning_rate = 0.001
+        min_learning_rate = 0.00001
+        
+        decay_rate = (min_learning_rate / default_learning_rate ) ** (1 / self.num_episodes)
+
+        self.lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate = default_learning_rate,
+            decay_steps = self.num_episodes,
+            decay_rate = decay_rate,
+            staircase = False
+        )
     
     def unwrapped_batch_train(self, states:tf.Tensor, actions:tf.Tensor, rewards:tf.Tensor, next_states:tf.Tensor, dones:tf.Tensor) -> float:
         with tf.GradientTape() as tape:
@@ -104,8 +119,6 @@ class DQN():
         return float(tf.reduce_mean(loss))
 
     def batch_train_memories(self, memory_sample: list[Memory]) -> float:
-
-
         ## here 
         states = np.array([mem.state for mem in memory_sample], dtype=np.float32)
         actions = np.array([mem.action for mem in memory_sample], dtype=np.int32)
@@ -146,6 +159,59 @@ class DQN():
     def copy_main_to_target(self):
         self.target_model.set_weights(self.model.get_weights())
 
+    def get_network_params(self) -> str:
+        params = [self.gamma, self.num_episodes, self.episode_count,
+                  self.num_memories_trained, self.network_structure]
+        params_string = "\n".join([str(param) for param in params])
+        
+        return params_string
+    
+    def check_folder_path(self, folder_path):
+        if folder_path[-1] != "/":
+            raise ValueError(f"Folder path must end with '/': {folder_path}")
+        try:
+            os.mkdir(folder_path)
+        except FileExistsError:
+            pass #doesn't matter if folder exists exists
+
+    def store_models(self, folder_path):
+        self.check_folder_path(folder_path)
+
+        self.model.save(folder_path + "primary_model.keras")
+        self.target_model.save(folder_path + "target_model.keras")
+
+        with open(folder_path + "network_information.info", "w+") as f:
+            model_params = self.get_network_params()
+            f.write(model_params)
+    
+    def build_from_storage(self, folder_path):
+        self.check_folder_path(folder_path)
+
+        self.model = tf.keras.models.load_model(folder_path + "primary_model.keras")
+        self.target_model = tf.keras.models.load_model(folder_path + "target_model.keras")
+        
+        param_arr = None
+        with open(folder_path + "network_information.info") as f:
+            lines = f.readlines()
+            self.gamma = float(lines[0])
+            self.num_episodes = int(lines[1])
+            self.episode_count = int(lines[2])
+            self.num_memories_trained = int(lines[3])
+            self.network_structure = ast.literal_eval(lines[4])
+
+        # Restore other fields
+        self.num_actions = self.network_structure[-1] - 1
+
+        # Rebuild LR schedule if needed
+        if self.num_episodes != -1:
+            self.generate_lr_schedule()
+            self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr_schedule)
+        else:
+            self.optimizer = tf.keras.optimizers.Adam()
+
+        self.loss_fn = tf.keras.losses.Huber()
+        self.batch_train = tf.function(self.unwrapped_batch_train)
+        
 class simple_dqn(DQN):
     def __init__(self, num_inputs, num_outputs, num_episodes = -1):
         structure = [num_inputs, int(num_inputs * 1.25), int(num_inputs * 1.0), int(num_inputs *0.75), int(num_inputs * 0.75), int(num_inputs * 0.5), int(num_inputs * 0.5), int(num_inputs * 0.5), int(num_inputs * 0.25), int(num_inputs * 0.5), num_outputs + 1, num_outputs + 1]

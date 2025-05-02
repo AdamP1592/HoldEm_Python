@@ -14,6 +14,7 @@ Logger.is_logging = False
 
 table = Table()
 players = []
+average_number_of_actions = []
 
 base_reward_weights = {"win": 1, "fold": 1, "bust": 1, "money gained": 1}
 
@@ -84,11 +85,7 @@ def is_legal_action(action_index, player_key):
             if player.total_money == 0:
                 #cant raise if you have no money.
                 return False
-
-            raise_amount = 0
-            if table.current_stage == "pre-flop":
-                table.current_raise += table.get_blind(player_key)
-            raise_amount += raise_sizes[action_index] * player.total_money
+            raise_amount = raise_sizes[action_index] * player.total_money 
 
             return raise_amount > table.current_raise and raise_amount < player.total_money
 
@@ -247,6 +244,7 @@ def play_hand_v2(player_models):
     gamma = 0.95
     print(num_actions)
     for player_key_index in range(len(player_keys)):
+        average_number_of_actions[player_key_index] += num_actions[player_key_index]
         
         player_key = player_keys[player_key_index]
         player = table.players[player_key]
@@ -264,7 +262,7 @@ def play_hand_v2(player_models):
             memory_buffer.merge_buffers(negative_memory_buffers[player_key_index])
             
     
-    return (memory_buffers, folded_players)
+    return (memory_buffers, folded_players, num_actions)
 def interpolate_reward(min_reward, max_reward, raw_reward):
     if abs(max_reward - min_reward) < 1e-6:
         return 0.0
@@ -302,24 +300,30 @@ def get_rewards_with_weights(starting_money:dict, folded_players:dict):
 
         win_reward = (win_weight * ( int(percent_change > 0)) ) 
         percent_change_reward = (percent_change * money_gained_weight) 
-        fold_punishment = int(folded_players[player_key]) * (- fold_weight)
+        fold_punishment = int(folded_players[player_key]) * (- fold_weight) * 1.25
         bust_punishment = - bust_weight * int(table.players[player_key].total_money == 0)
 
+        #gets the base reward with each generations weight vector for rewards
         raw_reward = win_reward + percent_change_reward + fold_punishment + bust_punishment
+        #normalizes the rewards based on the highest possible and lowest possible reward
         max_possible_reward = (1.25 * money_gained_weight) + win_weight
-        min_possible_reward = - (money_gained_weight + fold_weight + bust_weight)
+        min_possible_reward = - (money_gained_weight + (1.25 * fold_weight) + bust_weight)
+
         reward = interpolate_reward(min_possible_reward, max_possible_reward, raw_reward)
         assert -1.0 <= reward <= 1.0, f"reward out of bounds: {reward}"
+        
+        #applies reward
         rewards[player_key] = reward
-        percent_change_in_money[player_key] = percent_change
-        print(f"Total Reward: {rewards[player_key]}, Win Reward: {win_reward}, Percent change in money reward: {percent_change_reward}, Fold Punishment: {fold_punishment}, Bust Punishment: {bust_punishment}")
-    #normalizes reward to (-1.0, 1.0)
+
+        #for debugging
+        #percent_change_in_money[player_key] = percent_change
+        #print(f"Total Reward: {rewards[player_key]}, Win Reward: {win_reward}, Percent change in money reward: {percent_change_reward}, Fold Punishment: {fold_punishment}, Bust Punishment: {bust_punishment}")
+
     print(rewards)
-    
 
     return rewards
 
-def get_new_weights(old_keys):
+def get_new_weights(old_keys, mean_shift = 0.0, modification_range = 0.25):
     average_weights = [0 for i in range(len(base_reward_weights))]
     for player_key in old_keys:
         
@@ -333,7 +337,10 @@ def get_new_weights(old_keys):
         changed_weights = average_weights[:] # clone of averages
 
         random_index = random.randint(0, len(base_reward_weights) - 1)
-        random_modification = random.uniform(0.9, 1.05)
+
+        mean_modification = 1.0 + mean_shift
+        random_modification = random.uniform(mean_modification - (modification_range/2),
+                                            mean_modification + (modification_range/2))
 
         changed_weights[random_index] *= random_modification
         new_weights[index] = changed_weights
@@ -347,8 +354,8 @@ def update_low_performers(sorted_losses):
     next_two = keys[2:4]
     
     new_weights = []
-    new_weights += get_new_weights(first_two)
-    new_weights += get_new_weights(next_two)
+    new_weights += get_new_weights(first_two, modification_range = 0.1)
+    new_weights += get_new_weights(next_two, modification_range = 0.5)
     
     #average the weights, generate two new weights with a
     #random modification to each of the new weights
@@ -362,12 +369,9 @@ def update_low_performers(sorted_losses):
         print(f"Player: {key}, Loss Count: {sorted_losses[key]} Old Weights: {reward_weights[key]}, New Weights: {new_weights[offset]}")
         reward_weights[key] = new_weights[offset]# 0, 1, 2, 3
 
-    for player_key in sorted_losses:
-        print(f"Player: {player_key}, Loss Count: {failures[player_key]}")
-
-if __name__ == "__main__":
-    num_players = 8
-
+    
+def train(num_players:int):
+    global average_number_of_actions
     # State encoding:
     # 52 one-hot for hole cards
     # 52 one-hot for community cards
@@ -389,7 +393,7 @@ if __name__ == "__main__":
 
     num_episodes = 1000
 
-    num_generations = 20
+    num_generations = 40
 
     base_money = 5000
 
@@ -400,43 +404,64 @@ if __name__ == "__main__":
 
     build_table(num_players)
 
-
+    #generates random weight vector for each reward
     for player_key in table.players:
         reward_weights[player_key] = []
         for _ in range(len(base_reward_weights)):
             weight = random.random()
             reward_weights[player_key].append(weight)
 
+        #sets the base money and failure count
         table.players[player_key].total_money = base_money
         failures[player_key] = 0
+
     print(reward_weights)
 
-    #enerates all the networks
     
-    for _ in range(num_players):
+    average_number_of_actions.clear()
+    #Generates all the networks
+    for index in range(num_players):
         network = simple_dqn(num_state_variables, num_outputs, num_episodes = num_episodes)
         player_networks.append(network)
-
+        average_number_of_actions.append(0)
+    
+    #generation loop where each weight to the reward scheme is attempted
     for gen in range(num_generations):
+        average_number_of_actions = [0 for _ in range(num_players)]
 
+        #last geenration trains a ton, top half train a bit, rest train 1000
+        if gen >= num_generations -1:
+            num_episodes = 6000
+        elif gen >= (num_generations - 1)/2:
+            num_episodes = 2000
+        
+            
+        #resets each network for every genration to get a generalizable reward scheme that optimizes performance
         for net in player_networks:
             net.reset()
+
+        #generates memory buffers for each generation
         cumulative_memories = [ReplayBuffer(4000) for _ in range(num_players)]
 
+        #episode loop
         for eps in range(num_episodes):
+            print(gen)
             if keyboard.is_pressed('p'):
                 input("Paused. Press Enter to resume.")
             starting_money = {}
             for key in table.players:
                 starting_money[key] = table.players[key].total_money 
-            memory_buffers, folded_players = play_hand_v2(player_networks)
+
+            #grabs useful data from the hands
+            memory_buffers, folded_players, num_actions = play_hand_v2(player_networks)
             
+            #folds the old memories into the new memories for training
             for network_index in range(len(player_networks)):
                 
-                #folds the old memories into the new memories for training
+               
                 new_mem_sample_size = min(10, len(memory_buffers[network_index]))
                 old_mem_sample_size = min(100, len(cumulative_memories[network_index]))
-                
+
                 memories = (memory_buffers[network_index].sample(new_mem_sample_size) + 
                             cumulative_memories[network_index].sample(old_mem_sample_size))
                 
@@ -454,27 +479,48 @@ if __name__ == "__main__":
                 #double failure if the player runs out of money
                 if player.total_money <= starting_balance:
                     failures[key] += 1
-
-                #resets player money if they win or bust
-                if player.total_money == 0:
-                    failures[key] += 1
+                
+                #resets player if they bust and adds a harsh punishment
+                if player.total_money < 1:
+                    failures[key] += 2
                     player.total_money = base_money
 
+                #rapidly reduces money gained(to prevent lucky runs from giving too much) and gives a moderate reward for gaining money
                 if player.total_money > base_money * 1.5:
                     player.total_money *= 0.7
+                    failures[key] -= 0.5 # moderate reward for gaining money
+                
 
             for key in folded_players:
                 if folded_players[key]:
-                    failures[key] += 0.1
+                    failures[key] += 0.5 #moderate punishment for folding
+            print(eps)
+            print(f"Generation: {gen}")
+        
+        #gets average of number of actions
+        average_number_of_actions = [num_act/num_episodes for num_act in average_number_of_actions]
 
+        
 
         #top 2 make 2 children
         #next 2 make 2 children
+        # drop bottom 4
 
         sorted_losses = {k: v for k, v in sorted(failures.items(), key=lambda item: item[1])}
         update_low_performers(sorted_losses)
                 
         for key in failures:
             failures[key] = 0
+        for player in table.players.values():
+            player.total_money = base_money
 
+        #store networks every generation
+        for model_ind in range(len(player_networks)):
+            model_obj = player_networks[model_ind]
+            model_obj.store_models(f"./networks/model{model_ind}/")
+
+
+if __name__ == "__main__":
+    num_players = 8
+    train(num_players)
     print("EOF")
