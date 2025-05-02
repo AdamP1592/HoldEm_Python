@@ -5,7 +5,7 @@ from dqn import *
 
 from GameTests import *
 
-import random
+import random, ast
 import math
 import keyboard
 
@@ -519,8 +519,110 @@ def train(num_players:int):
             model_obj = player_networks[model_ind]
             model_obj.store_models(f"./networks/model{model_ind}/")
 
+        with open("./networks/reward_weights.data", "w+") as f:
+            for reward_scheme in reward_weights.values():
+                f.write("Weights:  " + str(reward_scheme) + "\n")
+
+def get_stored_reward_weights() -> list:
+    loaded_weights = []
+    with open("./networks/reward_weights.data", "r") as f:
+        lines = f.readlines()
+        
+        for line in lines:
+            # removes the "Weights: " from the file, then strips whitespace 
+            weight_str = line.split("Weights:")[1].strip()
+            weights = ast.literal_eval(weight_str)
+            loaded_weights.append(weights)
+    return loaded_weights
+
+def get_stored_networks(num_players:int) -> list:
+    networks = []
+    for i in range(num_players):
+        folder_path = f"./networks/model{i}/"
+        network = simple_dqn.from_storage(folder_path)
+        networks.append(network)
+    return networks
+
+def train_from_files(num_models):
+    global reward_weights
+    global average_number_of_actions
+
+    weights = get_stored_reward_weights()
+
+    if len(weights) != num_models:
+        raise ValueError(f"Expected {num_models} weight sets, found {len(weights)}")
+
+    
+    num_episodes = 6000
+    base_money = 5000
+
+    player_networks = []
+
+    reward_weights.clear()
+    average_number_of_actions.clear()
+    #sets reward weight vectors, clears
+    build_table(num_models)
+    
+    
+    for index, player_key in enumerate(table.players.keys()):
+
+        reward_weights[player_key] = weights[index]
+        table.players[player_key].total_money = base_money
+        average_number_of_actions.append(0)
+
+    player_networks = get_stored_networks(num_models)
+
+    cumulative_memories = [ReplayBuffer(4000) for _ in range(num_models)]
+
+    #episode loop
+    for eps in range(num_episodes):
+        if keyboard.is_pressed('p'):
+            input("Paused. Press Enter to resume.")
+        starting_money = {}
+        for key in table.players:
+            starting_money[key] = table.players[key].total_money 
+
+        #grabs useful data from the hands
+        memory_buffers, folded_players, num_actions = play_hand_v2(player_networks)
+        
+        #folds the old memories into the new memories for training
+        for network_index in range(len(player_networks)):
+            
+            
+            new_mem_sample_size = min(10, len(memory_buffers[network_index]))
+            old_mem_sample_size = min(100, len(cumulative_memories[network_index]))
+
+            memories = (memory_buffers[network_index].sample(new_mem_sample_size) + 
+                        cumulative_memories[network_index].sample(old_mem_sample_size))
+            
+
+            #grabs all the memories from the old hand
+            if len(memories) > 0:
+                player_networks[network_index].batch_train_memories(memories)
+                cumulative_memories[network_index].merge_buffers(memory_buffers[network_index])
+
+        #resets each player and builds out failure dict
+        for index, key in enumerate(table.players):
+            player = table.players[key]
+            
+            #resets player if they bust and adds a harsh punishment
+            if player.total_money < 1:
+                player.total_money = base_money
+
+            #rapidly reduces money gained(to prevent lucky runs from giving too much) and gives a moderate reward for gaining money
+            if player.total_money > base_money * 1.5:
+                player.total_money *= 0.7
+    for model_ind in range(len(player_networks)):
+        model_obj = player_networks[model_ind]
+        model_obj.store_models(f"./networks/model{model_ind}/")
+
+
+def play_against_models():
+    pass
 
 if __name__ == "__main__":
     num_players = 8
-    train(num_players)
+    train_from_files(num_players)
+
+
     print("EOF")

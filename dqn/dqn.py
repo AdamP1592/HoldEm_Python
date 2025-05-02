@@ -46,8 +46,9 @@ class DQN():
 
         if self.num_episodes != -1:
             self.generate_lr_schedule()
-        
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate = self.lr_schedule)
+            self.optimizer = tf.keras.optimizers.Adam(learning_rate = self.lr_schedule)
+        else:
+            self.optimizer = tf.keras.optimizers.Adam()
         self.loss_fn = tf.keras.losses.Huber()
 
 
@@ -216,3 +217,9 @@ class simple_dqn(DQN):
     def __init__(self, num_inputs, num_outputs, num_episodes = -1):
         structure = [num_inputs, int(num_inputs * 1.25), int(num_inputs * 1.0), int(num_inputs *0.75), int(num_inputs * 0.75), int(num_inputs * 0.5), int(num_inputs * 0.5), int(num_inputs * 0.5), int(num_inputs * 0.25), int(num_inputs * 0.5), num_outputs + 1, num_outputs + 1]
         super().__init__(structure, num_episodes)
+
+    @classmethod
+    def from_storage(cls, folder_path):
+        dummy = cls(0, 0)
+        dummy.build_from_storage(folder_path)
+        return dummy
