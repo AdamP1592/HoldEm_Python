@@ -99,19 +99,19 @@ class Table:
     def update_pot(self):
         self.pot = 0
         for player_key in self.players:
-
             self.total_raises[player_key] += 1
             player = self.players[player_key]
             self.pot += player.total_bet
             self.current_raise = max(self.current_raise, player.raise_amount)
 
     def get_starting_player(self) -> int:
-        player_keys = list(self.players.keys())
-        for key_ind in range(len(player_keys)):
-            if player_keys[key_ind] == self.big_blind_key:
-                return player_keys[(key_ind + 1) % len(player_keys)]
-        
+        active_players = self.get_active_players(self.big_blind_key)
+        #1 to the right of the big blind
+        return active_players[1][0]
+
     def apply_blind(self):
+
+
         if not self.blind_applied:
             big_blind_player = self.players[self.big_blind_key]
             big_blind_player.raise_(self.big_blind)
@@ -122,25 +122,44 @@ class Table:
             self.blind_applied = True
 
         self.current_raise = self.big_blind
+        self.update_pot()
 
-    def rotate_blinds(self):
-        player_keys = list(self.players.keys())
-        for key_ind in range(len(player_keys)):
-            if player_keys[key_ind] == self.big_blind_key:
-                #small blind starts at player_index 1
-                #big blind starts at player_index 0
-                #so shift big blind to the small blind and then shift the small blind to 2 indexes over
-                self.big_blind_key = player_keys[(key_ind + 1) % len(player_keys)]#shifts the big blind over 1
-                self.small_blind_key = player_keys[key_ind]
-                return
-                
+    def rotate_blinds(self, debug = False):
+        #gets active player queue, where the starting player is the current big blind
+        active_player_keys = [player_key for player_key, _, _ in self.get_active_players(self.big_blind_key)]
+        
+        if debug:
+            print("All players: ", self.players.keys())
+            print("Active Players:", active_player_keys)
+            print("Old big blind: ", self.big_blind_key)
+            print("Old small blind: ", self.small_blind_key)
+
+        #shifts the blind over by 1
+        num_active_players = len(active_player_keys)
+        if num_active_players < 2:
+            if debug:
+                print(f"[rotate blinds]: only {num_active_players}")
+            return False
+        
+        self.big_blind_key = active_player_keys[-1] # big blind is 1 to the left
+        self.small_blind_key = active_player_keys[-2] # small blind is one to the left of the new big blind
+
+        if debug:
+            print("New Big Blind: ", self.big_blind_key)
+            print("New Small Blind: ", self.small_blind_key)
+
+        return True
+
     def reset_hand(self):
         self.current_stage = "pre-flop"
         self.game.community_cards_index = 0
         self.current_raise = 50
+
         self.rotate_blinds()
         self.blind_applied = False
-        print("Resetting")
+
+        print("Resetting Hand")
+        
         self.game.reset()
         for player_key in self.total_raises:
             self.total_raises[player_key] = 0
@@ -193,6 +212,28 @@ class Table:
         self.current_raise = 0
         
         self.current_stage = stage_keys[(ind + 1) % len(stage_keys)]
+
+    def get_active_players(self, starting_player_key):
+        players_to_move = []
+        player_keys = list(self.players.keys())
+
+        starting_player_index = player_keys.index(starting_player_key)
+
+        for player_index in range(len(self.players)):
+            current_index = (starting_player_index + player_index) % (len(self.players))
+            current_player_key = player_keys[current_index]
+            player = self.players[current_player_key]
+
+            #if the player has no money, but they have made a bet for this round,
+            #add them to the queue
+            player_busted = (player.total_money < 1 and player.total_bet < 1)
+            player_all_in = (player.total_money < 1 and player.total_bet > 1)
+            if not player.folded and (not player_busted or player_all_in):
+                #print(f"Seat:{current_index}, folded:{player.folded}, raise:{player.total_bet}, current_raise:{self.current_raise} {'in' if not player.folded else 'out'}")
+                players_to_move.append((current_player_key, player, current_index))
+
+        return players_to_move
+    
     
     def print_comm_cards(self):
         for card in self.community_cards:

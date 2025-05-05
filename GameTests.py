@@ -140,3 +140,21 @@ def test_memory_buffer():
     buff2 = ReplayBuffer(10)
     for i in range(50):
         pass
+
+def test_rotating_blind_with_bust():
+    build_table(3)
+    keys = list(table.players.keys())
+    table.apply_blind()
+    table.deal()
+
+    #continuously advance stages until the hand is reset
+    table.advance_stage()
+    while table.current_stage != "pre-flop":
+        table.advance_stage()
+
+    #sets the middle player money to nothing
+    table.players[keys[1]].total_money = 0
+    table.rotate_blinds(debug = True)
+
+
+    

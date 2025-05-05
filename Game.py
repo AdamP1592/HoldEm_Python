@@ -91,24 +91,6 @@ def is_legal_action(action_index, player_key):
 
     return False
 
-def get_active_players(starting_player_key):
-    print("Building active player queue")
-    players_to_move = []
-    player_keys = list(table.players.keys())
-
-    starting_player_index = player_keys.index(starting_player_key)
-
-    for player_index in range(len(table.players)):
-        current_index = (starting_player_index + player_index) % (len(table.players))
-        current_player_key = player_keys[current_index]
-        player = table.players[current_player_key]
-
-        player_all_in = (player.total_money > 0 or player.total_bet < table.current_raise)
-        if not player.folded and player_all_in:
-            print(f"Seat:{current_index}, folded:{player.folded}, raise:{player.total_bet}, current_raise:{table.current_raise} {'in' if not player.folded else 'out'}")
-            players_to_move.append((current_player_key, player, current_index))
-    return players_to_move
-
 def get_player_action() -> int:
     action_map = {
         0: "Raise 1%", 1: "Raise 5%", 2: "Raise 10%", 3: "Raise 20%", 
@@ -143,6 +125,10 @@ def play_hand_against_models(player_models):
     table.update_pot()
     table.deal()
     
+    print("All player hands")
+    for player in table.players.values():
+        player.print_hand()
+
     num_actions = [0 for _ in range(len(table.players))]
 
     starting_player_key = table.get_starting_player()
@@ -162,7 +148,8 @@ def play_hand_against_models(player_models):
             pre_flop_passed = True
 
         #builds move queue
-        player_move_queue = get_active_players(starting_player_key)
+        player_move_queue = table.get_active_players(starting_player_key)
+        print(player_move_queue)
         
         #prevents actions when there is only one active player
         last_player = False
@@ -188,6 +175,7 @@ def play_hand_against_models(player_models):
             print("Community Cards:")
             table.print_comm_cards()
             print("Current Raise: ", table.current_raise)
+            print(current_player_key)
 
             #prints all the players bets
             for player_key in table.players:
@@ -204,6 +192,7 @@ def play_hand_against_models(player_models):
                     print(current_player_bet, end=" ")
 
             #gets initial table state
+
             table_state = table.get_state(current_player_key)
 
             #gets the action
@@ -227,7 +216,7 @@ def play_hand_against_models(player_models):
                             break_case = True
 
                     elif current_player.raised:
-                        player_move_queue = get_active_players(current_player_key)
+                        player_move_queue = table.get_active_players(current_player_key)
                         starting_player_key = current_player_key
                         if player_move_queue:
                             player_move_queue.pop(0)
@@ -311,7 +300,7 @@ def play_hand_v2(player_models):
 
         
 
-        player_move_queue = get_active_players(starting_player_key)
+        player_move_queue = table.get_active_players(starting_player_key)
         print("Number of active players: ", len(player_move_queue))
         if len(player_move_queue) <= 1:
             continue
@@ -360,7 +349,7 @@ def play_hand_v2(player_models):
                             break_case = True
 
                     elif current_player.raised:
-                        player_move_queue = get_active_players(current_player_key)
+                        player_move_queue = table.get_active_players(current_player_key)
                         starting_player_key = current_player_key
                         if player_move_queue:
                             player_move_queue.pop(0)
@@ -778,7 +767,6 @@ def play_against_models(total_num_models):
 
     if len(weights) != total_num_models:
         raise ValueError(f"Expected {total_num_models} weight sets, found {len(weights)}")
-
     
     base_money = 5000
 
@@ -809,6 +797,5 @@ def play_against_models(total_num_models):
 if __name__ == "__main__":
     num_players = 8
     play_against_models(num_players)
-
-
+    #test_rotating_blind_with_bust()
     print("EOF")

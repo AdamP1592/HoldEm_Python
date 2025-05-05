@@ -109,6 +109,8 @@ class HoldEm:
         self.logger.log("Distributing Pot: ")
         self.logger.log("Players Still Playing: ")
 
+        active_players = [key for key, player in self.players if not player.folded]
+
         for player_key in self.players:
             self.last_winners[player_key] = 0
             if not self.players[player_key].folded:
@@ -125,11 +127,9 @@ class HoldEm:
 
         if num_players_still_in == 1:
             self.logger.log("Only one player still in the game.")
-
-            keys = list(self.players.keys())
-            player_key = keys[0]
-            self.players[player_key].total_money += self.pot
-            self.players[player_key].total_bet = 0
+            winner_key = active_players[0]
+            self.players[winner_key].total_money += self.pot
+            self.players[winner_key].total_bet = 0
             return
 
         self.logger.log("Cards still in hole: " )
@@ -138,29 +138,38 @@ class HoldEm:
 
         #if there is more than 1 winner, that means the hand was concluded
         hand_ranks = rank_players(self.community_cards, player_hands)
+
+        leftovers = None
+        next_min_offset = 0
         for ranked_player_list in hand_ranks:
 
             while(len(ranked_player_list) != 0):
                 min_bet_key = min(self.players, key=lambda k: self.players[k].total_bet if self.players[k].total_bet > 0 else float('inf'))
 
                 min_bet = self.players[min_bet_key].total_bet # smallest potential subpot
-
+                #gets all players that bet on this subpot and haven't folded
                 subpot_contributors = [player_key for player_key, player in self.players.items() if player.total_bet > 0] 
                 subpot = 0
+                #returns rewards 
                 for subpot_contributor in subpot_contributors:
                     player = self.players[subpot_contributor]
                     player_bet = player.total_bet
                     if player_bet <= min_bet:
-                        subpot+= player_bet
+                        subpot += player_bet
                         player.total_bet = 0
                     else:
                         player.total_bet -= min_bet
                         subpot += min_bet
 
-                eligible_winners = [key for key in ranked_player_list if key in subpot_contributors]
+                eligible_winners = [key for key in ranked_player_list if key in subpot_contributors and not self.players[key].folded]
+
+                ineligible_in_subpot = [key for key in ranked_player_list if key in subpot_contributors]
                 #catch case if there are no eligible winners in the list
                 if not eligible_winners:
+                    next_min_offset += 1
+                    leftovers += ineligible_in_subpot
                     break
+                next_min_offset = 0
 
                 amount_per_winner = subpot/len(eligible_winners)
                 #applies the money to the winners
@@ -176,10 +185,116 @@ class HoldEm:
             if self.pot == 0:
                 break
         for player in self.players.values():
+            player.total_money += player.total_bet
+            player.total_bet = 0 
+
+
+    def get_bets_that_match(self, sorted_bets, current_max_bet):
+        bets_that_match = []
+        for bet, player_obj in sorted_bets:
+            if not bet == current_max_bet:
+                break
+            bets_that_match.append((bet, player_obj))
+        return bets_that_match
+            
+    def distribute_potv2(self):
+        player_hands = {}
+        num_players_still_in = 0
+
+        self.logger.log("Distributing Pot: ")
+        self.logger.log("Players Still Playing:")
+
+        active_players = [key for key, player in self.players.items() if not player.folded]
+
+        for player_key in self.players:
+            self.last_winners[player_key] = 0
+            if not self.players[player_key].folded:
+                self.logger.log(str(player_key))
+                num_players_still_in += 1
+                player_hand = self.players[player_key].get_hand()
+                if player_hand:
+                    player_hands[player_key] = player_hand.get_cards()
+                else:
+                    player_hands[player_key] = None
+
+        if num_players_still_in == 1:
+            self.logger.log("Only one player still in the game.")
+            winner_key = active_players[0]
+            self.players[winner_key].total_money += self.pot
+            self.players[winner_key].total_bet = 0
+            self.pot = 0
+            return
+
+        self.logger.log("Cards still in hole:")
+        for card in self.community_cards:
+            self.logger.log("\t" + str(card))
+
+        hand_ranks = rank_players(self.community_cards, player_hands)
+
+        leftovers = []
+        next_min_offset = 0
+
+        for ranked_player_list in hand_ranks:
+            while len(ranked_player_list) != 0:
+                subpot_contributors = [key for key, p in self.players.items() if p.total_bet > 0]
+                if not subpot_contributors:
+                    break
+
+                sorted_contributors = sorted(subpot_contributors, key=lambda k: self.players[k].total_bet)
+                if next_min_offset >= len(sorted_contributors):
+                    break  # safety check
+
+                min_bet_key = sorted_contributors[next_min_offset]
+                min_bet = self.players[min_bet_key].total_bet
+
+                subpot = 0
+                for key in subpot_contributors:
+                    player = self.players[key]
+                    if player.total_bet <= min_bet:
+                        subpot += player.total_bet
+                        player.total_bet = 0
+                    else:
+                        subpot += min_bet
+                        player.total_bet -= min_bet
+
+                eligible_winners = [key for key in ranked_player_list if key in subpot_contributors and not self.players[key].folded]
+                ineligible_in_subpot = [key for key in ranked_player_list if key in subpot_contributors and self.players[key].folded]
+
+                if not eligible_winners:
+                    next_min_offset += 1
+                    leftovers.extend(ineligible_in_subpot)
+                    break  # skip this subpot
+                else:
+                    leftovers = []
+                    next_min_offset = 0
+
+                amount_per_winner = subpot / len(eligible_winners)
+                for player_key in eligible_winners:
+                    self.last_winners[player_key] += amount_per_winner
+                    self.players[player_key].total_money += amount_per_winner
+                    self.pot -= amount_per_winner
+
+                for i in range(len(ranked_player_list) - 1, -1, -1):
+                    if self.players[ranked_player_list[i]].total_bet == 0:
+                        del ranked_player_list[i]
+
+            if self.pot == 0:
+                break
+
+        # Refund leftover folded players their unmatched excess
+        for player_key in leftovers:
+            refund = self.players[player_key].total_bet
+            self.players[player_key].total_money += refund
+            self.pot -= refund
+            self.players[player_key].total_bet = 0
+
+        # Clear any remaining bets (typically 0 at this point)
+        for player in self.players.values():
+            player.total_money += player.total_bet
             player.total_bet = 0
-  
+
     def reset(self):
-        self.distribute_pot()
+        self.distribute_potv2()
         #return each card from hands
 
         self.logger.log("Deck: " + str(self.deck))
