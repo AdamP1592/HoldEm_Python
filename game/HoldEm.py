@@ -231,7 +231,6 @@ class HoldEm:
 
         hand_ranks = rank_players(self.community_cards, player_hands)
 
-        leftovers = []
         next_min_offset = 0
 
         for ranked_player_list in hand_ranks:
@@ -258,14 +257,9 @@ class HoldEm:
                         player.total_bet -= min_bet
 
                 eligible_winners = [key for key in ranked_player_list if key in subpot_contributors and not self.players[key].folded]
-                ineligible_in_subpot = [key for key in ranked_player_list if key in subpot_contributors and self.players[key].folded]
-
                 if not eligible_winners:
                     next_min_offset += 1
-                    leftovers.extend(ineligible_in_subpot)
-                    break  # skip this subpot
                 else:
-                    leftovers = []
                     next_min_offset = 0
 
                 amount_per_winner = subpot / len(eligible_winners)
@@ -280,13 +274,6 @@ class HoldEm:
 
             if self.pot == 0:
                 break
-
-        # Refund leftover folded players their unmatched excess
-        for player_key in leftovers:
-            refund = self.players[player_key].total_bet
-            self.players[player_key].total_money += refund
-            self.pot -= refund
-            self.players[player_key].total_bet = 0
 
         # Clear any remaining bets (typically 0 at this point)
         for player in self.players.values():
