@@ -2,9 +2,14 @@ from game.Logger import Logger
 class Player:
     def __init__(self):
         self.hand = None
+        #action flags
         self.folded = False
         self.checked = False
         self.raised = False
+        #state flags
+        self.all_in = False
+        self.bust = False
+
         self.raise_amount = 0
         self.total_bet = 0
         self.total_money = 5000
@@ -86,6 +91,7 @@ class Player:
             cards_in_hand = [card for card in self.hand.get_cards()] # shallow copy, but not just reference to list
         self.next_turn()
         self.folded = False
+        self.all_in = False
         self.total_bet = 0
         self.hand = None
         return cards_in_hand
@@ -96,3 +102,6 @@ class Player:
             for card in self.hand.get_cards():
                 print(card, end = "")
             print()
+    def get_hand_str(self):
+        if self.hand:
+            return self.hand.to_true_string()

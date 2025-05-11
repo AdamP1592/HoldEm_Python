@@ -10,7 +10,7 @@ import math
 import keyboard
 
 l = Logger(reset=True)
-Logger.is_logging = False
+Logger.is_logging = True
 
 table = Table()
 players = []
@@ -45,18 +45,19 @@ def action(player, action:int):
         case 8:
             player.check()
         case 7: 
+            if player.total_money < table.current_raise:
+                player.all_in = True
             player.call(table.current_raise)
-            table.update_pot()
+        case 6:
+            raise_amount = player.total_money
+            player.raise_(raise_amount)
+            player.all_in = True
         case _:
 
             raise_amount = raise_amounts[action] + table.current_raise
-            player_money = player.total_money
             player.raise_(raise_amount)
                         
-            table.update_pot()
-            #if it's an all in, set the current_raise to that amount
-            if player_money < raise_amount:
-                table.current_raise = raise_amount
+    table.update_pot()
 
 
 def build_table(numPlayers:int):
@@ -114,13 +115,21 @@ def get_player_action() -> int:
 
 def play_hand_against_models(player_models):
     starting_money = {}
-
+    
     human_player_index = len(player_models) - 1
     human_player_key = list(table.players.keys())[human_player_index]
 
+    #check if each player bust
     for player_key in table.players:
         starting_money[player_key] = table.players[player_key].total_money
+        if table.players[player_key].total_money == 0:
+            if not table.players[player_key].bust == False:
+                l.log(f"Player {str(player_key)} bust")
+            table.players[player_key].bust = True
+            
+        print(player_key)
 
+    #apply blinds and deal cards
     table.apply_blind()
     table.update_pot()
     table.deal()
@@ -128,6 +137,7 @@ def play_hand_against_models(player_models):
     print("All player hands")
     for player in table.players.values():
         player.print_hand()
+        l.log(player.get_hand_str())
 
     num_actions = [0 for _ in range(len(table.players))]
 
@@ -140,23 +150,28 @@ def play_hand_against_models(player_models):
     for player_key in table.players:
         folded_players[player_key] = False
 
+    bust_players = [player_key for player_key in table.players if table.players[player_key].bust]
+
     while (table.current_stage != "pre-flop" or pre_flop) and not break_case:
         pre_flop = False
-
-        #extra pre-flop passed flag
-        if table.current_stage == "flop":
-            pre_flop_passed = True
-
+        print("Community Cards:")
+                
+        l.log(table.current_stage)
+        l.log("Pot: " + str(table.pot))
+        l.log("Community Cards: ")
+        for card in table.community_cards:
+            if card:# prevents none type errors
+                l.log(str(card))
+        table.print_comm_cards()
         #builds move queue
         player_move_queue = table.get_active_players(starting_player_key)
-        print(player_move_queue)
-        
+
         #prevents actions when there is only one active player
         last_player = False
         if len(player_move_queue) <= 1:
-            table.advance_stage()
             last_player = True
-        
+            print("Last player to move")
+
         #loops through active players
         while player_move_queue and not break_case and not last_player:
             """debug
@@ -168,28 +183,37 @@ def play_hand_against_models(player_models):
             """
 
             current_player_key, current_player, network_index = player_move_queue.pop(0)
+            l.log("Table Current Raise: " + str(table.current_raise))
+            l.log("Player: " + str(current_player_key))
+            l.log("Money: " + str(current_player.total_money))
+            l.log("Total Bet: " + str(current_player.total_bet))
+            l.log("Current Raise: " + str(current_player.raise_amount))
             #prints hand when it's the human player
-            if current_player_key == human_player_key:
-                current_player.print_hand()
+            #if current_player_key == human_player_key
+            current_player.print_hand()
             
-            print("Community Cards:")
-            table.print_comm_cards()
+
             print("Current Raise: ", table.current_raise)
-            print(current_player_key)
+            print("Current Player: ", network_index)
 
             #prints all the players bets
             for player_key in table.players:
                 current_player_bet = table.players[player_key].total_bet
+                total_chips = table.players[player_key].total_money
+                # if the player bust they will never make an action so print bust and never anything but that
+                if player_key in bust_players:
+                    print("Bust", end = " ")
+                    continue
+                # if the player folded, print folded and nothing else. Since a player cant be active and be the current player placing it as an elif doesnt change anything
                 if table.players[player_key].folded:
                     print("Folded", end = " ")
                     continue
-                elif player_key == current_player_key:
+                #print which player is the current player
+                if player_key == current_player_key:
                     print("*", end="")
-
-                if current_player_bet == 0 and table.players[player_key].total_money == 0:
-                    print("Bust", end = " ")
-                else:
-                    print(current_player_bet, end=" ")
+                #prints that players current bet
+                #print(f"Bet: {current_player_bet}, Total Chips: {total_chips}", end=" ")
+                print(f"{current_player_bet}(Total Chips:{total_chips})", end = " ")
 
             #gets initial table state
 
@@ -208,6 +232,7 @@ def play_hand_against_models(player_models):
                     print(player_action)
                     action(current_player, player_action)
                     print("Action: ", player_action)
+                    l.log("Action: " + str(player_action))
   
                     if current_player.folded:
                         folded_players[current_player_key] = True
@@ -235,10 +260,14 @@ def play_hand_against_models(player_models):
                     bad_action_count += 1
 
         print("End of betting round")
+        print(table.current_stage)
+
+        pre_flop_passed = True
         if table.current_stage == "river":
             break
         table.advance_stage()
 
+    l.log("Final Pot: " + str(table.pot))
     print("Final Pot: ", table.pot)
 
     if table.current_stage != "pre-flop" or not pre_flop_passed:
@@ -246,7 +275,9 @@ def play_hand_against_models(player_models):
 
     print("Player Balances: ")
     for key, player in table.players.items():
-            print(f"Player {key}: ${player.total_money:.2f} {'(You)' if key == human_player_key else ''}")
+            balance_string = f"Player {key}: ${player.total_money:.2f} {'(You)' if key == human_player_key else ''}"
+            l.log(balance_string)
+            print(balance_string)
     print(table.current_stage, " ", pre_flop_passed)
 
     print("\n\n****HAND OVER****\n\n")
@@ -370,10 +401,9 @@ def play_hand_v2(player_models):
             if len(negative_memory_buffers[network_index]) > 50:
                 memories = negative_memory_buffers[network_index].sample(10)
                 player_models[network_index].batch_train_memories(memories)
+
         print("End of betting round")
         table.advance_stage()
-
-
 
     print(table.current_stage, " ", pre_flop_passed)
     if table.current_stage != "pre-flop" or not pre_flop_passed:
@@ -788,11 +818,12 @@ def play_against_models(total_num_models):
 
     human_player_key = list(table.players.keys())[-1]
     while table.players[human_player_key].total_money > 1:
+
+        play_hand_against_models(player_networks)
+
         choice = input("Press [Enter] to play next hand, or type 'q' to quit: ").lower()
         if choice == 'q':
             return
-        play_hand_against_models(player_networks)
-
 
 if __name__ == "__main__":
     num_players = 8

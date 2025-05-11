@@ -20,8 +20,8 @@ class HoldEm:
 
         self.last_winners = {}
 
-        self.logger.log("Num Cards: " + str(len(self.deck.cards)))
-        self.logger.log("Deck: " + str(self.deck))
+        #debug self.logger.log("Num Cards: " + str(len(self.deck.cards)))
+        #debug self.logger.log("Deck: " + str(self.deck))
 
     def update_pot(self):
         self.pot = 0
@@ -30,7 +30,7 @@ class HoldEm:
     def river(self):
         self.update_pot()
         c = self.deck.deal_card()
-        self.logger.log("River: " + str(c))
+        #debug self.logger.log("River: " + str(c))
         c.visible = True
         self.community_cards[4] = c
         self.community_cards_index += 1
@@ -38,19 +38,19 @@ class HoldEm:
     def turn(self):
         self.update_pot()
         c = self.deck.deal_card()
-        self.logger.log("Turn: " + str(c))
+        #debug self.logger.log("Turn: " + str(c))
         c.visible = True
         self.community_cards[3] = c
         self.community_cards_index += 1
 
     def flop(self):
         self.update_pot()
-        self.logger.log("Flop: ")
+        #debug self.logger.log("Flop: ")
         for i in range(3):
             c = self.deck.deal_card()
             c.visible = True
             self.community_cards[i] = c
-            self.logger.log("\t" + str(c))
+            #debug self.logger.log("\t" + str(c))
         self.community_cards_index = 2
 
 
@@ -78,13 +78,13 @@ class HoldEm:
 
     def deal_hands(self):
         self.pot = 0
-        self.logger.log("Dealing Hands: ")
+        #debug self.logger.log("Dealing Hands: ")
         for player_key, player in self.players.items():
             
             card1 = self.deck.deal_card()
             card2 = self.deck.deal_card()
-            self.logger.log("Player :" + player_key, end = "")
-            self.logger.log(f"({card1}, {card2})")
+            #debug self.logger.log("Player :" + player_key, end = "")
+            #debug self.logger.log(f"({card1}, {card2})")
             player.hand = Hand([card1, card2])
             
 
@@ -106,8 +106,8 @@ class HoldEm:
         player_hands = {}
         num_players_still_in = 0
 
-        self.logger.log("Distributing Pot: ")
-        self.logger.log("Players Still Playing: ")
+        #debug self.logger.log("Distributing Pot: ")
+        #debug self.logger.log("Players Still Playing: ")
 
         active_players = [key for key, player in self.players if not player.folded]
 
@@ -115,7 +115,7 @@ class HoldEm:
             self.last_winners[player_key] = 0
             if not self.players[player_key].folded:
                 
-                self.logger.log(str(player_key))
+                #debug self.logger.log(str(player_key))
 
                 num_players_still_in +=1
                 player_hand = self.players[player_key].get_hand()
@@ -126,15 +126,15 @@ class HoldEm:
                     player_hands[player_key] = None
 
         if num_players_still_in == 1:
-            self.logger.log("Only one player still in the game.")
+            #debug self.logger.log("Only one player still in the game.")
             winner_key = active_players[0]
             self.players[winner_key].total_money += self.pot
             self.players[winner_key].total_bet = 0
             return
 
-        self.logger.log("Cards still in hole: " )
-        for card in self.community_cards:
-            self.logger.log("\t" + str(card))
+        #debug self.logger.log("Cards still in hole: " )
+        #for card in self.community_cards:
+            #debug self.logger.log("\t" + str(card))
 
         #if there is more than 1 winner, that means the hand was concluded
         hand_ranks = rank_players(self.community_cards, player_hands)
@@ -198,18 +198,19 @@ class HoldEm:
         return bets_that_match
             
     def distribute_potv2(self):
+        self.logger.log("Distributing pot: ")
         player_hands = {}
         num_players_still_in = 0
 
-        self.logger.log("Distributing Pot: ")
-        self.logger.log("Players Still Playing:")
+        #debug self.logger.log("Distributing Pot: ")
+        #debug self.logger.log("Players Still Playing:")
 
         active_players = [key for key, player in self.players.items() if not player.folded]
 
         for player_key in self.players:
             self.last_winners[player_key] = 0
             if not self.players[player_key].folded:
-                self.logger.log(str(player_key))
+                #debug self.logger.log(str(player_key))
                 num_players_still_in += 1
                 player_hand = self.players[player_key].get_hand()
                 if player_hand:
@@ -218,24 +219,26 @@ class HoldEm:
                     player_hands[player_key] = None
 
         if num_players_still_in == 1:
-            self.logger.log("Only one player still in the game.")
+            #debug self.logger.log("Only one player still in the game.")
             winner_key = active_players[0]
             self.players[winner_key].total_money += self.pot
             self.players[winner_key].total_bet = 0
             self.pot = 0
             return
 
-        self.logger.log("Cards still in hole:")
-        for card in self.community_cards:
-            self.logger.log("\t" + str(card))
+        #debug self.logger.log("Cards still in hole:")
+        #for card in self.community_cards:
+            #debug self.logger.log("\t" + str(card))
 
         hand_ranks = rank_players(self.community_cards, player_hands)
 
         next_min_offset = 0
 
-        for ranked_player_list in hand_ranks:
+        for i in range(len(hand_ranks)):
+            ranked_player_list = hand_ranks[i]
             while len(ranked_player_list) != 0:
                 subpot_contributors = [key for key, p in self.players.items() if p.total_bet > 0]
+                self.logger.log("Subpot Contributors: " + str(subpot_contributors))
                 if not subpot_contributors:
                     break
 
@@ -245,23 +248,29 @@ class HoldEm:
 
                 min_bet_key = sorted_contributors[next_min_offset]
                 min_bet = self.players[min_bet_key].total_bet
-
+                self.logger.log("Min Bet: " + str(min_bet))
+                refund = {}
                 subpot = 0
                 for key in subpot_contributors:
                     player = self.players[key]
+                    #grabs the total bet prior to modifying the bet
+                    refund[key] = player.total_bet
                     if player.total_bet <= min_bet:
                         subpot += player.total_bet
                         player.total_bet = 0
                     else:
                         subpot += min_bet
                         player.total_bet -= min_bet
-
+                self.logger.log("Total Subpot: " + str(subpot))
                 eligible_winners = [key for key in ranked_player_list if key in subpot_contributors and not self.players[key].folded]
-                if not eligible_winners:
+                if len(eligible_winners) == 0:
+                    for key in refund:
+                        self.players[key].total_bet += refund[key]
                     next_min_offset += 1
+                    break
                 else:
                     next_min_offset = 0
-
+                self.logger.log("Subpot has eligible winners")
                 amount_per_winner = subpot / len(eligible_winners)
                 for player_key in eligible_winners:
                     self.last_winners[player_key] += amount_per_winner
@@ -269,14 +278,17 @@ class HoldEm:
                     self.pot -= amount_per_winner
 
                 for i in range(len(ranked_player_list) - 1, -1, -1):
+                    
                     if self.players[ranked_player_list[i]].total_bet == 0:
+                        self.logger.log("Dropping player: " + str(ranked_player_list[i]))
                         del ranked_player_list[i]
 
             if self.pot == 0:
                 break
-
+        self.logger.log("Leftover Cleanup: ")
         # Clear any remaining bets (typically 0 at this point)
         for player in self.players.values():
+            self.logger.log(f"Total Money: {str(player.total_money)}, Total Bet: {str(player.total_bet)}")
             player.total_money += player.total_bet
             player.total_bet = 0
 
@@ -284,9 +296,9 @@ class HoldEm:
         self.distribute_potv2()
         #return each card from hands
 
-        self.logger.log("Deck: " + str(self.deck))
+        #debug self.logger.log("Deck: " + str(self.deck))
 
-        self.logger.log("Returning Cards: ")
+        #debug self.logger.log("Returning Cards: ")
         for key in self.players.keys():
             cards = self.players[key].reset()
             if cards:
@@ -301,8 +313,8 @@ class HoldEm:
                 self.community_cards[cardInd] = None
 
         self.community_cards_index = 0
-        self.logger.log("Num Cards: " + str(len(self.deck.cards)))
-        self.logger.log("Deck: " + str(self.deck))
+        #debug self.logger.log("Num Cards: " + str(len(self.deck.cards)))
+        #debug self.logger.log("Deck: " + str(self.deck))
 
 
         self.deck.shuffle()

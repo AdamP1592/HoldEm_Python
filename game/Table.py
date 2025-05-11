@@ -105,7 +105,7 @@ class Table:
             self.current_raise = max(self.current_raise, player.raise_amount)
 
     def get_starting_player(self) -> int:
-        active_players = self.get_active_players(self.big_blind_key)
+        active_players = self.get_players_in_hand(self.big_blind_key)
         #1 to the right of the big blind
         return active_players[1][0]
 
@@ -126,7 +126,7 @@ class Table:
 
     def rotate_blinds(self, debug = False):
         #gets active player queue, where the starting player is the current big blind
-        active_player_keys = [player_key for player_key, _, _ in self.get_active_players(self.big_blind_key)]
+        active_player_keys = [player_key for player_key, _, _ in self.get_players_in_hand(self.big_blind_key)]
         
         if debug:
             print("All players: ", self.players.keys())
@@ -213,8 +213,8 @@ class Table:
         
         self.current_stage = stage_keys[(ind + 1) % len(stage_keys)]
 
-    def get_active_players(self, starting_player_key):
-        players_to_move = []
+    def get_players_in_hand(self, starting_player_key):
+        unfolded_players = []
         player_keys = list(self.players.keys())
 
         starting_player_index = player_keys.index(starting_player_key)
@@ -225,10 +225,32 @@ class Table:
             player = self.players[current_player_key]
 
             #if the player has no money, but they have made a bet for this round,
+            if not player.bust:
+                #print(f"Seat:{current_index}, folded:{player.folded}, raise:{player.total_bet}, current_raise:{self.current_raise} {'in' if not player.folded else 'out'}")
+                unfolded_players.append((current_player_key, player, current_index))
+
+        return unfolded_players
+    
+
+    def get_active_players(self, starting_player_key):
+        players_to_move = []
+        player_keys = list(self.players.keys())
+
+        starting_player_index = player_keys.index(starting_player_key)
+
+        for offset in range(len(self.players)):
+            current_index = (starting_player_index + offset) % (len(self.players))
+            current_player_key = player_keys[current_index]
+            player = self.players[current_player_key]
+
+            #if the player has no money, but they have made a bet for this round,
             #add them to the queue
             player_busted = (player.total_money < 1 and player.total_bet < 1)
-            player_all_in = (player.total_money < 1 and player.total_bet > 1)
-            if not player.folded and (not player_busted or player_all_in):
+            player_all_in = (player.total_money == 0 and player.total_bet > 0)
+            #print(f"Player: {current_player_key}, Folded: {player.folded}, Bust: {player_busted}, All in: {player_all_in}")
+            # not (player_busted or player_all_in)
+            print(f"Player: {current_index}, All In:{player.all_in}, Bust: {player.bust} ")
+            if not player.folded and not player.all_in and not player.bust:
                 #print(f"Seat:{current_index}, folded:{player.folded}, raise:{player.total_bet}, current_raise:{self.current_raise} {'in' if not player.folded else 'out'}")
                 players_to_move.append((current_player_key, player, current_index))
 
