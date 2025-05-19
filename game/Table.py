@@ -282,7 +282,7 @@ class Table:
             return True
 
 
-   def print_table_state(self, human_player_key, display_hands = False):
+    def print_table_state(self, human_player_key, display_hands = False):
         display_cards = False
         if self.is_showdown() or display_hands == True:
             display_cards = True
