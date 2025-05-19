@@ -282,23 +282,59 @@ class Table:
             return True
 
 
-    def print_table_state(self, human_player_key, display_hands = False):
+
+    def print_table_state(self, human_player_key = None, display_hands = False):
         display_cards = False
         if self.is_showdown() or display_hands == True:
             display_cards = True
 
         box_extension = ""
+        TOTAL_WIDTH = 48
+        PLAYER_COL_WIDTH = 10
+        STACK_COL_WIDTH = 11
+        BET_COL_WIDTH = 11
+        ACTION_COL_WIDTH = 12
+        CARD_COL_WIDTH = 11
 
-        header_top =    "+--------+-----------+----------+------------+"
-        header_labels = "| Player |   Stack   |   Bet    |   Action   |"
-        header_bottom = "+--------+-----------+----------+------------+"
+        header_sizes = [PLAYER_COL_WIDTH, STACK_COL_WIDTH, BET_COL_WIDTH, ACTION_COL_WIDTH, CARD_COL_WIDTH]
+        headers = ["Player", "Stack", "Bet", "Action"]
+        header_top = ""
+        header_labels = ""
+        header_bottom = ""
+
+
+        for header_index in range(len(headers)):
+            header_size = header_sizes[header_index]
+            header_text = headers[header_index]
+
+            #for centering the text
+            midpoint = header_size//2
+            header_start = midpoint - (len(header_text)//2) 
+
+            #padding due to being centered
+            padding = (" " * header_start)
+
+            #generates each col
+            header_top += "+" + ("-" * header_size)
+            header_labels += "|" + padding + header_text + padding
+
+        # add closing chars
+        header_top += "+"
+        header_labels += "|"
+
+        #copy top to bottom
+        header_bottom = header_top
 
         #reformats header if state demands cards need to be displayed
         if display_cards:
-            box_extension += ("-" * 11) + "+" # Extension for border
+            #holder for the extension of the display table
+            box_extension += ("-" * CARD_COL_WIDTH) + "+" # Extension for border
 
+            TOTAL_WIDTH += len(box_extension) 
             header_top += box_extension
-            header_labels += "   Cards" + (" " * 3) + "|"
+            card_label = "   Cards   "
+
+            header_labels += card_label + "|"
             header_bottom += box_extension
 
         print(header_top)
@@ -313,12 +349,24 @@ class Table:
             #rounds to the nearest whole number, converts to str
             player_money = str(int(player.total_money))
             player_bet = str(int(player.raise_amount))
+
+            #len(player_col) is always -1 because each col includes the border
+
             # Player col 
-            row = f"| P{index}" + (" " * 5) 
+            player_col = f"| P{index}"
+            if key == human_player_key:
+                player_col += "(You)"
+
+            player_col += " " * (PLAYER_COL_WIDTH - (len(player_col) - 1))
+            
             # Stack col
-            row += f"| ${player_money}" + (" " * (9 - len(player_money)))
+            stack_col = f"| ${player_money}"
+            stack_col += " " * (STACK_COL_WIDTH - (len(stack_col) - 1))
+
             # Bet col
-            row += f"| ${player_bet}" + (" " * (8 - len(player_bet)))
+            bet_col = f"| ${player_bet}"
+            bet_col += " " * (BET_COL_WIDTH - (len(bet_col) - 1))
+
             action = ""
             if player.folded:
                 action = "Folded"
@@ -329,12 +377,18 @@ class Table:
             elif player.raised:
                 action = "Raised"
 
-            row += f"| {action} " + (" " * (10 - len(action)))
+            #action col
+
+            action_col = f"| {action} "
+            action_col += " " * (ACTION_COL_WIDTH - (len(action_col) - 1))
+
+            row = player_col + stack_col + bet_col + action_col
 
             if display_cards:
                 hand = str(player.get_hand())
-                row += f"| {hand}" + (" " * (10 - len(hand)))
-                row += ""
+                hand_col = f"| {hand}"
+                hand_col += " " * (CARD_COL_WIDTH - (len(hand_col) - 1))
+                row += hand_col
             row += "|"
 
             print(row)

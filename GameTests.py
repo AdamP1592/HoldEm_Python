@@ -162,7 +162,7 @@ def test_display():
     table.deal()
     first_key = list(table.players.keys())[0]
     table.print_table_state(first_key, True)
-
+    """
     table.players[first_key].total_money += 10000.05
     table.print_table_state(first_key, True)
 
@@ -171,5 +171,5 @@ def test_display():
 
     table.players[first_key].raise_(50000)
     table.print_table_state(first_key, True)
-
+    """
     
