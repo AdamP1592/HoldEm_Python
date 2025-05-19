@@ -82,6 +82,7 @@ class Player:
                 self.total_bet += self.total_money
                 self.raise_amount += self.total_money
                 self.total_money = 0
+                self.all_in = True
                 
             return True
         

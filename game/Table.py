@@ -253,7 +253,7 @@ class Table:
             player_all_in = (player.total_money == 0 and player.total_bet > 0)
             #print(f"Player: {current_player_key}, Folded: {player.folded}, Bust: {player_busted}, All in: {player_all_in}")
             # not (player_busted or player_all_in)
-            print(f"Player: {current_index}, All In:{player.all_in}, Bust: {player.bust}, Fold: {player.folded} ")
+            # print(f"Player: {current_index}, All In:{player.all_in}, Bust: {player.bust}, Fold: {player.folded} ")
             if not player.folded and not player.all_in and not player.bust:
                 #print(f"Seat:{current_index}, folded:{player.folded}, raise:{player.total_bet}, current_raise:{self.current_raise} {'in' if not player.folded else 'out'}")
                 players_to_move.append((current_player_key, player, current_index))
@@ -282,8 +282,21 @@ class Table:
             return True
 
 
-
     def print_table_state(self, human_player_key = None, display_hands = False):
+        # TABLE INFORMATION
+        print("=== Game State ===")
+        print(f"Stage: {self.current_stage.capitalize()}")
+        print(f"Pot: ${self.pot}")
+        print(f"Current Raise: ${int(self.current_raise)}")
+        print(self.current_stage)
+        if self.current_stage != "pre-flop":
+            print("Community Cards:", end=" ")
+            for card in self.community_cards:
+                if card != None:
+                    print(f"[{card}]", end=" ")
+            print("\n")
+
+        #check if it's valid to show every players cards
         display_cards = False
         if self.is_showdown() or display_hands == True:
             display_cards = True
@@ -330,6 +343,7 @@ class Table:
             #holder for the extension of the display table
             box_extension += ("-" * CARD_COL_WIDTH) + "+" # Extension for border
 
+            #adds to total width(currently unused but useful)
             TOTAL_WIDTH += len(box_extension) 
             header_top += box_extension
             card_label = "   Cards   "
@@ -337,6 +351,7 @@ class Table:
             header_labels += card_label + "|"
             header_bottom += box_extension
 
+        #prints the whole headers
         print(header_top)
         print(header_labels)
         print(header_bottom)
