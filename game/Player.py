@@ -17,6 +17,9 @@ class Player:
         self.raise_applied = True
 
         self.logger = Logger()
+        
+        #SOLELY FOR DISPLAY PURPOSES
+        self.called = False
     
 
     def set_hand(self, h):
@@ -27,6 +30,8 @@ class Player:
 
     def check(self):
         if not self.folded:
+            self.called = False
+    
             self.raised = False
             self.checked = True
             self.raise_amount = 0
@@ -40,6 +45,8 @@ class Player:
         if raise_amount > self.total_money:
             raise_amount = self.total_money
         
+        self.called = False
+
         self.raise_applied = False
         self.raised = True
         self.checked = False
@@ -63,6 +70,7 @@ class Player:
             #flags get set when a call is applied
             self.checked = True
             self.raised = False
+            self.called = True
             # since the call is effectively a raise to the current bet amount
             self.raise_applied = False 
 
@@ -83,6 +91,7 @@ class Player:
         self.raise_amount = 0
         self.checked = False
         self.raised = False
+        self.called = False
 
     def reset(self):
         self.logger.log("Resetting Player")

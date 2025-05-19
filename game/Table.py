@@ -231,7 +231,11 @@ class Table:
 
         return unfolded_players
     
-
+    def any_player_all_in(self) -> bool:
+        for player_key in self.players:
+            if self.players[player_key].all_in == True:
+                return True
+        return False
     def get_active_players(self, starting_player_key):
         players_to_move = []
         player_keys = list(self.players.keys())
@@ -249,14 +253,95 @@ class Table:
             player_all_in = (player.total_money == 0 and player.total_bet > 0)
             #print(f"Player: {current_player_key}, Folded: {player.folded}, Bust: {player_busted}, All in: {player_all_in}")
             # not (player_busted or player_all_in)
-            print(f"Player: {current_index}, All In:{player.all_in}, Bust: {player.bust} ")
+            print(f"Player: {current_index}, All In:{player.all_in}, Bust: {player.bust}, Fold: {player.folded} ")
             if not player.folded and not player.all_in and not player.bust:
                 #print(f"Seat:{current_index}, folded:{player.folded}, raise:{player.total_bet}, current_raise:{self.current_raise} {'in' if not player.folded else 'out'}")
                 players_to_move.append((current_player_key, player, current_index))
 
         return players_to_move
-    
-    
+    def betting_round_complete(self):
+        for player in self.players.values():
+            # if player could make an action but hasn't, return false
+            if not(player.folded or player.checked or player.raised or player.bust or player.all_in):
+                return False
+        return True
+    def is_showdown(self) -> bool:
+        #arbitrary starting point
+        active_players = self.get_active_players(self.big_blind_key)
+        players_still_in = self.get_players_in_hand(self.big_blind_key)
+        
+        # if there is only 1 player left then the player doesnt show hands
+        if len(players_still_in) < 2:
+            return False
+
+        #if there is 1 or 0 players that havent: bust, gone all in, or folded
+        if len(active_players) <= 1:
+            return True
+        #if its the end of the final round
+        elif self.current_stage == "river" and self.betting_round_complete():
+            return True
+
+
+   def print_table_state(self, human_player_key, display_hands = False):
+        display_cards = False
+        if self.is_showdown() or display_hands == True:
+            display_cards = True
+
+        box_extension = ""
+
+        header_top =    "+--------+-----------+----------+------------+"
+        header_labels = "| Player |   Stack   |   Bet    |   Action   |"
+        header_bottom = "+--------+-----------+----------+------------+"
+
+        #reformats header if state demands cards need to be displayed
+        if display_cards:
+            box_extension += ("-" * 11) + "+" # Extension for border
+
+            header_top += box_extension
+            header_labels += "   Cards" + (" " * 3) + "|"
+            header_bottom += box_extension
+
+        print(header_top)
+        print(header_labels)
+        print(header_bottom)
+
+        # Every time there is a " " * (number - len(value)) that's just padding the box with spaces.
+        # Could just use .ljust() but the result is the same exact thing, but I learned about it
+        # after doing this
+        for index, key in enumerate(self.players):
+            player = self.players[key]
+            #rounds to the nearest whole number, converts to str
+            player_money = str(int(player.total_money))
+            player_bet = str(int(player.raise_amount))
+            # Player col 
+            row = f"| P{index}" + (" " * 5) 
+            # Stack col
+            row += f"| ${player_money}" + (" " * (9 - len(player_money)))
+            # Bet col
+            row += f"| ${player_bet}" + (" " * (8 - len(player_bet)))
+            action = ""
+            if player.folded:
+                action = "Folded"
+            elif player.called:
+                action = "Called"
+            elif player.checked:
+                action = "Checked"
+            elif player.raised:
+                action = "Raised"
+
+            row += f"| {action} " + (" " * (10 - len(action)))
+
+            if display_cards:
+                hand = str(player.get_hand())
+                row += f"| {hand}" + (" " * (10 - len(hand)))
+                row += ""
+            row += "|"
+
+            print(row)
+        
+        #dont need to rebuild the border edge, just use the existing top
+        print(header_top)
+ 
     def print_comm_cards(self):
         for card in self.community_cards:
             if card != None:

@@ -156,5 +156,20 @@ def test_rotating_blind_with_bust():
     table.players[keys[1]].total_money = 0
     table.rotate_blinds(debug = True)
 
+def test_display():
+    build_table(3)
+    table.apply_blind()
+    table.deal()
+    first_key = list(table.players.keys())[0]
+    table.print_table_state(first_key, True)
+
+    table.players[first_key].total_money += 10000.05
+    table.print_table_state(first_key, True)
+
+    table.players[first_key].total_money += 100000.05
+    table.print_table_state(first_key, True)
+
+    table.players[first_key].raise_(50000)
+    table.print_table_state(first_key, True)
 
     

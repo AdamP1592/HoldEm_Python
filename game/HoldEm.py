@@ -234,6 +234,34 @@ class HoldEm:
 
         next_min_offset = 0
 
+        # sort players by total_bet descending
+        sorted_players = sorted(
+            self.players.keys(),
+            key=lambda player_key: (self.players[player_key].total_bet, player_key),
+            reverse=True
+        )
+
+        # prevent only one player from trying to win against himself
+        assert len(sorted_players) >= 2, "Need 2 or more players to play a hand."
+
+        # get the keys
+        highest_bet_key = sorted_players[0]
+        second_highest_bet_key = sorted_players[1]
+
+        # get their bets
+        highest_bet = self.players[highest_bet_key].total_bet
+        second_highest_bet = self.players[second_highest_bet_key].total_bet
+
+        # if they dont match, clip the highest bet to the called bet level
+        bet_difference = highest_bet - second_highest_bet
+        if bet_difference > 0:
+        
+            
+            highest_player = self.players[highest_bet_key]
+
+            highest_player.total_money += bet_difference
+            highest_player.total_bet -= bet_difference
+
         for i in range(len(hand_ranks)):
             ranked_player_list = hand_ranks[i]
             while len(ranked_player_list) != 0:
