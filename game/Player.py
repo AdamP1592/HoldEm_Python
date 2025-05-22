@@ -74,7 +74,7 @@ class Player:
             # since the call is effectively a raise to the current bet amount
             self.raise_applied = False 
 
-            if (amount_needed_to_match <= self.total_money):
+            if (amount_needed_to_match < self.total_money):
                 self.total_money -= amount_needed_to_match
                 self.raise_amount += amount_needed_to_match
                 self.total_bet += amount_needed_to_match

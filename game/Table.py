@@ -236,7 +236,7 @@ class Table:
             if self.players[player_key].all_in == True:
                 return True
         return False
-    def get_active_players(self, starting_player_key):
+    def get_active_players(self, starting_player_key, starting_key_removal = True):
         players_to_move = []
         player_keys = list(self.players.keys())
 
@@ -245,17 +245,14 @@ class Table:
         for offset in range(len(self.players)):
             current_index = (starting_player_index + offset) % (len(self.players))
             current_player_key = player_keys[current_index]
+            if current_player_key == starting_player_key and starting_key_removal:
+                continue
             player = self.players[current_player_key]
 
-            #if the player has no money, but they have made a bet for this round,
-            #add them to the queue
-            player_busted = (player.total_money < 1 and player.total_bet < 1)
-            player_all_in = (player.total_money == 0 and player.total_bet > 0)
-            #print(f"Player: {current_player_key}, Folded: {player.folded}, Bust: {player_busted}, All in: {player_all_in}")
-            # not (player_busted or player_all_in)
-            # print(f"Player: {current_index}, All In:{player.all_in}, Bust: {player.bust}, Fold: {player.folded} ")
+
+            ## DEBUG print(f"Player: {current_index}, All In:{player.all_in}, Bust: {player.bust}, Fold: {player.folded} ")
             if not player.folded and not player.all_in and not player.bust:
-                #print(f"Seat:{current_index}, folded:{player.folded}, raise:{player.total_bet}, current_raise:{self.current_raise} {'in' if not player.folded else 'out'}")
+                ## DEBUG print(f"Seat:{current_index}, folded:{player.folded}, raise:{player.total_bet}, current_raise:{self.current_raise} {'in' if not player.folded else 'out'}")
                 players_to_move.append((current_player_key, player, current_index))
 
         return players_to_move
@@ -267,7 +264,7 @@ class Table:
         return True
     def is_showdown(self) -> bool:
         #arbitrary starting point
-        active_players = self.get_active_players(self.big_blind_key)
+        active_players = self.get_active_players(self.big_blind_key, starting_key_removal = False)
         players_still_in = self.get_players_in_hand(self.big_blind_key)
         
         # if there is only 1 player left then the player doesnt show hands
@@ -282,7 +279,7 @@ class Table:
             return True
 
 
-    def print_table_state(self, human_player_key = None, display_hands = False):
+    def print_table_state(self, current_player_key = None, human_player_key = None, display_hands = False):
         # TABLE INFORMATION
         print("=== Game State ===")
         print(f"Stage: {self.current_stage.capitalize()}")
@@ -293,7 +290,7 @@ class Table:
             print("Community Cards:", end=" ")
             for card in self.community_cards:
                 if card != None:
-                    print(f"[{card}]", end=" ")
+                    print(f"{card}", end=" ")
             print("\n")
 
         #check if it's valid to show every players cards
@@ -306,11 +303,13 @@ class Table:
         PLAYER_COL_WIDTH = 10
         STACK_COL_WIDTH = 11
         BET_COL_WIDTH = 11
+        TOTAL_BET_COL_WIDTH = 14
         ACTION_COL_WIDTH = 12
         CARD_COL_WIDTH = 11
 
-        header_sizes = [PLAYER_COL_WIDTH, STACK_COL_WIDTH, BET_COL_WIDTH, ACTION_COL_WIDTH, CARD_COL_WIDTH]
-        headers = ["Player", "Stack", "Bet", "Action"]
+
+        header_sizes = [PLAYER_COL_WIDTH, STACK_COL_WIDTH, BET_COL_WIDTH, TOTAL_BET_COL_WIDTH, ACTION_COL_WIDTH, CARD_COL_WIDTH]
+        headers = ["Player", "Stack", "Bet", "Chips In Pot", "Action"]
         header_top = ""
         header_labels = ""
         header_bottom = ""
@@ -319,7 +318,6 @@ class Table:
         for header_index in range(len(headers)):
             header_size = header_sizes[header_index]
             header_text = headers[header_index]
-
             #for centering the text
             midpoint = header_size//2
             header_start = midpoint - (len(header_text)//2) 
@@ -338,18 +336,21 @@ class Table:
         #copy top to bottom
         header_bottom = header_top
 
+        ## originally only showed cards on the case of a showdown, but now
+        ## the box is always extended to fit cards, but only shows player cards until the showdown
+        box_extension += ("-" * CARD_COL_WIDTH) + "+" # Extension for border
+
+        #adds to total width(currently unused but useful)
+        TOTAL_WIDTH += len(box_extension) 
+        header_top += box_extension
+        card_label = "   Cards   "
+
+        header_labels += card_label + "|"
+        header_bottom += box_extension
         #reformats header if state demands cards need to be displayed
-        if display_cards:
+        #if display_cards:
             #holder for the extension of the display table
-            box_extension += ("-" * CARD_COL_WIDTH) + "+" # Extension for border
-
-            #adds to total width(currently unused but useful)
-            TOTAL_WIDTH += len(box_extension) 
-            header_top += box_extension
-            card_label = "   Cards   "
-
-            header_labels += card_label + "|"
-            header_bottom += box_extension
+            
 
         #prints the whole headers
         print(header_top)
@@ -364,6 +365,7 @@ class Table:
             #rounds to the nearest whole number, converts to str
             player_money = str(int(player.total_money))
             player_bet = str(int(player.raise_amount))
+            player_bet_total = str(int(player.total_bet))
 
             #len(player_col) is always -1 because each col includes the border
 
@@ -371,6 +373,8 @@ class Table:
             player_col = f"| P{index}"
             if key == human_player_key:
                 player_col += "(You)"
+            if key == current_player_key:
+                player_col += "*"
 
             player_col += " " * (PLAYER_COL_WIDTH - (len(player_col) - 1))
             
@@ -382,6 +386,10 @@ class Table:
             bet_col = f"| ${player_bet}"
             bet_col += " " * (BET_COL_WIDTH - (len(bet_col) - 1))
 
+            # Total Bet col
+            total_bet_col = f"| ${player_bet_total}"
+            total_bet_col += " " * (TOTAL_BET_COL_WIDTH - (len(total_bet_col) - 1))
+
             action = ""
             if player.folded:
                 action = "Folded"
@@ -391,19 +399,22 @@ class Table:
                 action = "Checked"
             elif player.raised:
                 action = "Raised"
+            elif player.bust:
+                action = "Bust"
 
             #action col
 
             action_col = f"| {action} "
             action_col += " " * (ACTION_COL_WIDTH - (len(action_col) - 1))
 
-            row = player_col + stack_col + bet_col + action_col
-
-            if display_cards:
+            row = player_col + stack_col + bet_col + total_bet_col + action_col
+            hand_col = "|"
+            if (display_cards or key == human_player_key) and not player.folded:
                 hand = str(player.get_hand())
-                hand_col = f"| {hand}"
-                hand_col += " " * (CARD_COL_WIDTH - (len(hand_col) - 1))
-                row += hand_col
+                hand_col += f" {hand}"
+
+            hand_col += " " * (CARD_COL_WIDTH - (len(hand_col) - 1))
+            row += hand_col
             row += "|"
 
             print(row)
