@@ -379,7 +379,7 @@ def play_hand_v2(player_models):
                                         
                     if current_player.folded:
                         folded_players[current_player_key] = True
-                        live_seats = sum([1 for p in table.players.values() if not p.folded])
+                        live_seats = sum([1 for p in table.players.values() if not p.folded or p.all_in])
                         if live_seats <= 1:
                             hand_over = True
 
@@ -460,10 +460,16 @@ def play_hand_v2(player_models):
             #reward gets distributed with diminishing reward 
             #across each move
             memory.reward = rewards[player_key] * (gamma ** memory_ind)
-
-        if memory_buffer.buffer:
+        # conditional is just in case, the network was a big blind and everyone else folded,
+        #  there are no rewards to apply and no negative memories to store
+        if memory_buffer.buffer: 
             memory_buffer.buffer[-1].is_done = True
-            memory_buffer.merge_buffers(negative_memory_buffers[player_key_index])
+
+            num_merge_entries = math.ceil(len(negative_memory_buffers[player_key_index]) * 0.1)
+            retained_negative_memories = negative_memory_buffers[player_key_index].sample(num_merge_entries)
+
+            for memory in retained_negative_memories:
+                memory_buffer.store_memory(memory)
             
     
     return (memory_buffers, folded_players, num_actions)
@@ -573,7 +579,6 @@ def update_low_performers(sorted_losses):
 
         print(f"Player: {key}, Loss Count: {sorted_losses[key]} Old Weights: {reward_weights[key]}, New Weights: {new_weights[offset]}")
         reward_weights[key] = new_weights[offset]# 0, 1, 2, 3
-
     
 def train(num_players:int):
     global average_number_of_actions
@@ -643,7 +648,7 @@ def train(num_players:int):
             net.reset()
 
         #generates memory buffers for each generation
-        cumulative_memories = [ReplayBuffer(3000) for _ in range(num_players)]
+        cumulative_memories = [ReplayBuffer(1000) for _ in range(num_players)]
 
         #episode loop
         for eps in range(num_episodes):
@@ -656,15 +661,32 @@ def train(num_players:int):
                 starting_money[key] = table.players[key].total_money 
 
             #grabs useful data from the hands
+
+            # 1. memory buffers are a custom type. 
+            # 2. folded players are a dict of {player_key: player_folded(boolean)}
+            # 3. num_actions is an array of the number of actions a player took where the
+            # index of the key in players matches the index of the action count
+
+            """ POTENTIAL ADDITION:
+
+                Add num_hands_per_episde variable so the network can play multiple hands and
+                get better data to train on rather than a single hand.
+
+                This would be helpful for early hands to build up training data
+                faster since the networks are trained once an episode.
+
+            """
             memory_buffers, folded_players, num_actions = play_hand_v2(player_networks)
-            
+
             #folds the old memories into the new memories for training
+            player_keys = list(table.players.keys())
             for network_index in range(len(player_networks)):
                 
                
                 new_mem_sample_size = min(10, len(memory_buffers[network_index]))
                 old_mem_sample_size = min(100, len(cumulative_memories[network_index]))
 
+                # Train on NEW memories + Old memories
                 memories = (memory_buffers[network_index].sample(new_mem_sample_size) + 
                             cumulative_memories[network_index].sample(old_mem_sample_size))
                 
@@ -674,28 +696,39 @@ def train(num_players:int):
                     player_networks[network_index].batch_train_memories(memories)
                     cumulative_memories[network_index].merge_buffers(memory_buffers[network_index])
 
-            #resets each player and builds out failure dict
+                
+                ## ** SEE NOTES FOR REWARD INFO ** ##
+                ## Genetic Failure Weights: 
+                # resets each player and builds out failure dict
+                key = player_keys[network_index]
                 player = table.players[key]
                 starting_balance = starting_money[key]
 
-                #double failure if the player runs out of money
+
+                # failure if the player loses money
                 if player.total_money <= starting_balance:
-                    failures[key] += 1
+                    # adds a failure scaled to the amount of money lost clipped at a minimum of 0.1, with a maximum of 1.0 if the player bust
+
+                    # 1 - the change in total money starting balance. 0.0 if they are the sa
+                    failures[key] += min((player.total_money / starting_balance), 0.1)
                 
-                #resets player if they bust and adds a harsh punishment
-                if player.total_money < 1:
-                    failures[key] += 2
+                # resets player if they bust and adds a harsh punishment 
+                if player.total_money < 1 or player.bust:
+                    print(f"Player {network_index} ran out of money")
+                    failures[key] += 2 
                     player.total_money = base_money
+                    player.bust = False
 
                 #rapidly reduces money gained(to prevent lucky runs from giving too much) and gives a moderate reward for gaining money
                 if player.total_money > base_money * 1.5:
-                    player.total_money *= 0.7
+                    player.total_money = (player.total_money * 2) // 3
                     failures[key] -= 0.5 # moderate reward for gaining money
-                
+
 
             for key in folded_players:
                 if folded_players[key]:
-                    failures[key] += 0.5 #moderate punishment for folding
+                    failures[key] += 0.2 #moderate punishment for folding
+
             print(eps)
             print(f"Generation: {gen}")
         
@@ -782,7 +815,9 @@ def train_from_files(num_models):
             input("Paused. Press Enter to resume.")
         starting_money = {}
         for key in table.players:
-            starting_money[key] = table.players[key].total_money 
+            
+            starting_money[key] = table.players[key].total_money
+            print(key, " Starting Money: ", starting_money[key]) 
 
         #grabs useful data from the hands
         memory_buffers, folded_players, num_actions = play_hand_v2(player_networks)
@@ -863,7 +898,7 @@ def choose_operation(num_players=8):
         train_from_files(num_players)
     elif "3" in option:
         confirmation = input("Training new models destroys existing models.\nAre you sure you want to train new models?(y/n)").strip().lower()
-        if confirmation.contains("y"):
+        if "y" in confirmation:
             train(num_players)
     else:
         print("Invalid input. Please try again.\n")

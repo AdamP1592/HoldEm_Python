@@ -13,12 +13,19 @@ class ReplayBuffer():
             self.buffer[0]
         self.buffer.append(memory)
     
-    def sample(self, num_entries:int)->list:
+    def sample(self, num_entries:int, replacement = True)->list:
         sample = []
         num_entries = min(num_entries, len(self.buffer))
+
         for i in range(num_entries):
-            memory = self.buffer[random.randint(0, len(self.buffer) - 1)]
+            random_index = random.randint(0, len(self.buffer) - 1)
+
+            memory = self.buffer[random_index]
             sample.append(memory)
+
+            if not replacement:
+                self.buffer.pop(random_index)
+
         return sample
 
     def __len__(self):

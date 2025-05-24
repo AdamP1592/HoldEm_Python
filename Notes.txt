@@ -1,0 +1,43 @@
+
+
+
+GENETIC REWARD AND PUNISHMENT SCHEME: 
+    Punishments:
+        Money lost: 
+            [0.1, 1.0], relative to the percentage of money lost
+        
+        Bust:
+            2.0. If the agent runs out of all money there is a harsh punishment
+        
+        Folds:
+            0.2 Minor punishmnet for folding to promote reward schemes that actually play
+        
+    Rewards:
+        0.5 if the agent ends a hand with more than 1.5 * the amount of money each agent started with originally. 
+            ADDITION: When this happens, remove a third of their money. This is to prevent runs of good luck from
+            having a permanent effect on growth
+
+    Each hand:
+        Worst Case:
+            (Folded): 
+                Money Lost:
+                    1.0
+                Bust:
+                    0.0
+                Fold:
+                    0.2
+                Total failure stat:
+                    1.2
+            Bust:
+                Money Lost: 
+                    1.0
+                Bust:
+                    2.0
+                Fold:
+                    0.0
+                Total failure stat:
+                    3.0
+        Best case:
+            Reward:
+                Won more than 1.5 * the amount of money initially given to the agent
+                    Faulure total -= 0.5
