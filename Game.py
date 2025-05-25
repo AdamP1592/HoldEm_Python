@@ -601,7 +601,7 @@ def train(num_players:int):
 
     num_outputs = 10
 
-    base_num_episodes = 1000
+    base_num_episodes = 1
 
     num_generations = 35
 
@@ -689,13 +689,11 @@ def train(num_players:int):
                 # Train on NEW memories + Old memories
                 memories = (memory_buffers[network_index].sample(new_mem_sample_size) + 
                             cumulative_memories[network_index].sample(old_mem_sample_size))
-                
 
                 #grabs all the memories from the old hand
                 if len(memories) > 0:
                     player_networks[network_index].batch_train_memories(memories)
                     cumulative_memories[network_index].merge_buffers(memory_buffers[network_index])
-
                 
                 ## ** SEE NOTES FOR REWARD INFO ** ##
                 ## Genetic Failure Weights: 
@@ -734,8 +732,6 @@ def train(num_players:int):
         
         #gets average of number of actions
         average_number_of_actions = [num_act/num_episodes for num_act in average_number_of_actions]
-
-        
 
         #top 2 make 2 children
         #next 2 make 2 children

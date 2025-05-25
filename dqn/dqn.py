@@ -19,6 +19,10 @@ class DQN():
         
         self.build_model(network_structure)
 
+        #WRAPPED FUNCTION
+        self.batch_train = tf.function(self.unwrapped_batch_train)
+
+
     def get_layers(self, network_structure):
         network_structure = network_structure[:]
         output_layer = tf.keras.layers.Dense(network_structure[len(network_structure) - 1])
@@ -38,9 +42,6 @@ class DQN():
         layers = self.get_layers(network_structure)
         self.target_model = tf.keras.Sequential(layers)
         self.target_model.build(input_shape=(None, network_structure[0]))
-        
-        #WRAPPED FUNCTION
-        self.batch_train = tf.function(self.unwrapped_batch_train)
 
         self.copy_main_to_target()
 
@@ -51,11 +52,17 @@ class DQN():
             self.optimizer = tf.keras.optimizers.Adam()
         self.loss_fn = tf.keras.losses.Huber()
 
-
-    
-
     def reset(self):
-        self.build_model(self.network_structure)
+        for layer in self.model.layers:
+             #scrable the existing network
+             if hasattr(layer, "kernel_initializer"):
+                # re-sample a new kernel and bias from their initializers
+                new_kernel = layer.kernel_initializer(shape=layer.kernel.shape)
+                new_bias   = layer.bias_initializer  (shape=layer.bias.shape)
+                # assign them back
+                layer.kernel.assign(new_kernel)
+                layer.bias.assign(new_bias)
+        self.copy_main_to_target()
         self.num_memories_trained = 0
         self.episode_count = 0
 
