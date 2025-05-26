@@ -601,7 +601,7 @@ def train(num_players:int):
 
     num_outputs = 10
 
-    base_num_episodes = 1
+    base_num_episodes = 1000
 
     num_generations = 35
 
@@ -708,18 +708,22 @@ def train(num_players:int):
                     # adds a failure scaled to the amount of money lost clipped at a minimum of 0.1, with a maximum of 1.0 if the player bust
 
                     # 1 - the change in total money starting balance. 0.0 if they are the sa
-                    failures[key] += min((player.total_money / starting_balance), 0.1)
-                
+                    failures[key] += max(1.0 - (player.total_money / starting_balance), 0.1)
+                else:
+                    failures[key] -= 0.5
                 # resets player if they bust and adds a harsh punishment 
                 if player.total_money < 1 or player.bust:
                     print(f"Player {network_index} ran out of money")
-                    failures[key] += 2 
+                    failures[key] += 1.0
                     player.total_money = base_money
                     player.bust = False
 
                 #rapidly reduces money gained(to prevent lucky runs from giving too much) and gives a moderate reward for gaining money
                 if player.total_money > base_money * 1.5:
-                    player.total_money = (player.total_money * 2) // 3
+                    amount_over_base_money = player.total_money - base_money
+                    amount_to_remove = amount_over_base_money // 4
+                    player.total_money -= amount_to_remove
+            
                     failures[key] -= 0.5 # moderate reward for gaining money
 
 

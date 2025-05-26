@@ -14,7 +14,7 @@ Agents are trained over **generations** using freshly initialized Dueling Double
 - TensorFlow 2.x
 - NumPy
 
-**Memory warning**: Full training consumes **8–10 GB RAM**. If using lower-spec hardware:
+**Memory warning**: Full training consumes **2-4 GB RAM**. If using lower-spec hardware:
 - Reduce network width/depth
 - Decrease replay buffer sizes
 - Swap from using tf.function in the dqn file to just the unwrapped function. Will yield slower training but will save a lot of ram
