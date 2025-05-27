@@ -3,11 +3,7 @@ from game.Table import Table
 from game.Logger import Logger
 from dqn import *
 
-from GameTests import *
-
-import random, ast, os
-import math
-import keyboard
+import random, ast, os, math, keyboard
 
 l = Logger(reset=True)
 Logger.is_logging = False

@@ -1,4 +1,9 @@
 python_version ~= "3.11"
 
 numpy == 1.26.4
+<<<<<<< HEAD
 tensorflow == 2.19.0
+keyboard == 0.13.5
+=======
+tensorflow == 2.19.0
+>>>>>>> origin/DuelingDoubleDeepQNet-HoldEm
