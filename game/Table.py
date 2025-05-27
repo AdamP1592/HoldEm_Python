@@ -155,7 +155,6 @@ class Table:
         self.game.community_cards_index = 0
         self.current_raise = 50
 
-        self.rotate_blinds()
         self.blind_applied = False
 
         print("Resetting Hand")
@@ -409,7 +408,7 @@ class Table:
 
             row = player_col + stack_col + bet_col + total_bet_col + action_col
             hand_col = "|"
-            if (display_cards or key == human_player_key) and not player.folded:
+            if (display_cards or key == human_player_key) and not (player.folded or player.bust):
                 hand = str(player.get_hand())
                 hand_col += f" {hand}"
 

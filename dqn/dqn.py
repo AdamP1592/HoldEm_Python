@@ -55,13 +55,17 @@ class DQN():
     def reset(self):
         for layer in self.model.layers:
              #scrable the existing network
-             if hasattr(layer, "kernel_initializer"):
+            if hasattr(layer, "kernel_initializer"):
                 # re-sample a new kernel and bias from their initializers
                 new_kernel = layer.kernel_initializer(shape=layer.kernel.shape)
                 new_bias   = layer.bias_initializer  (shape=layer.bias.shape)
                 # assign them back
                 layer.kernel.assign(new_kernel)
                 layer.bias.assign(new_bias)
+            else:
+                ## IF THERE IS A NETWORK WITHOUT KERNEL INIT, ADD A SECONDARY CONDITION 
+                ## FOR IT
+                raise AttributeError("Network has no attribute kernel_initializer")
         self.copy_main_to_target()
         self.num_memories_trained = 0
         self.episode_count = 0
@@ -145,7 +149,10 @@ class DQN():
             tf.constant(next_states),
             tf.constant(dones)
         )
-        ## here
+        ## if the number of memoreis trained is greater than 500, copy main to target
+        ## since the number of memories per training changes, using > 500 over % 500
+        ## ensures the network can be copied even if the last training makes the network
+        ## exceed the threshold
         if self.num_memories_trained > 500:
             self.num_memories_trained = 0
             self.copy_main_to_target()
@@ -198,7 +205,6 @@ class DQN():
         self.model = tf.keras.models.load_model(folder_path + "primary_model.keras")
         self.target_model = tf.keras.models.load_model(folder_path + "target_model.keras")
         
-        param_arr = None
         with open(folder_path + "network_information.info") as f:
             lines = f.readlines()
             self.gamma = float(lines[0])

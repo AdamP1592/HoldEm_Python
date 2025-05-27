@@ -100,12 +100,24 @@ Agents are trained over **generations** using freshly initialized Dueling Double
 
 ---
 
+## Demo
+
+For the demo, I trained two classes of networks using distinct failure metrics in the genetic evolution phase to encourage **both short-term aggressive strategies and long-term conservative play**:
+
+- **Type A – Aggressive:**  
+  These networks were evolved with a **reduced penalty for busting**, allowing them to explore higher-risk strategies early in training. This promotes aggressive behavior such as frequent raises, and greater exploration of all-ins.
+
+- **Type B – Conservative:**  
+  These networks used a **higher bust penalty**, discouraging early elimination and encouraging more risk-averse strategies. As a result, these agents developed more passive behaviors such as tighter hand selection and greater fold frequency under pressure.
+
+After evolving both variants independently, I selected the **top 4 performers from each group** (based on their respective failure and success metrics) and combined them into a single population. These 8 agents were then retrained together for **8000 episodes** to promote strategic cross-adaptation, allowing aggressive and conservative styles to co-evolve and refine their play against a diverse pool of opponents.
+
+
 ## Future Improvements
 
 - Add epsilon decay during training
 - Add multi-table parallel generation evolution (cross-table gene mixing)
 - Normalize model evaluation across more networks
-- Build human-vs-model demo interface
 
 ---
 
@@ -119,3 +131,34 @@ This system was built under **hardware constraints** on a 6-year-old laptop with
 The framework can be scaled horizontally with more compute (parallel training, threading, larger buffers) or extended with more sophisticated learning heuristics.
 
 ---
+## Original Design
+
+The original system was designed as a **multi-population evolutionary framework** inspired by biological specialization and global competition. While **hardware constraints** required simplification, the conceptual structure remains central to the project's foundations.
+
+### Population Structure
+
+- **3 Local Tables** — Each with **6 agents** and a unique failure metric:
+  - These tables evolve agents with specialized playstyles through independent genetic loops.
+  - Each table encourages different strategic biases (e.g., risk tolerance, value seeking, survival).
+
+- **1 Global Table** — A central table with **8 agents**:
+  - This table uses a **simple fitness function** based only on whether agents **won money** or **busted** during a hand.
+  - It serves as the evaluation environment where agents from diverse backgrounds compete head-to-head.
+
+### Evolution and Replacement
+
+- Every **10 generations**, the global table:
+  - **Drops its bottom 6 performers**
+  - **Promotes the top 2 agents from each of the 3 local tables**
+
+- The **top 2 agents from the global table** create **genetic "children"** that are seeded back into the local tables, replacing underperformers and injecting successful strategies into niche environments.
+
+### Purpose and Benefits
+
+This structure was designed to:
+- Maintain **strategic diversity** through specialized failure metrics
+- Encourage **generalization and robustness** by forcing top agents to perform across varied environments
+- Promote **emergent strategy synthesis** via cross-table interaction and selective pressure
+- Simulate **local adaptation and global competition**, mirroring natural evolutionary dynamics
+
+Although the final implementation was scaled down due to resource limitations, the core ideas—**reward shaping, strategic variance, and meta-level policy convergence**—are preserved in the training methodology.

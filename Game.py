@@ -50,7 +50,10 @@ def action(player, action:int):
             player.call(table.current_raise)
         case 6:
             raise_amount = player.total_money
-            player.raise_(raise_amount)
+            if raise_amount <= table.current_raise:
+                player.call(table.current_raise)
+            else:
+                player.raise_(raise_amount)
             player.all_in = True
         case _:
 
@@ -127,11 +130,7 @@ def play_hand_against_models(player_models):
     #check if each player bust
     for player_key in table.players:
         starting_money[player_key] = table.players[player_key].total_money
-        if table.players[player_key].total_money == 0:
-            #if not table.players[player_key].bust == False:
-            #    l.log(f"Player {str(player_key)} bust")
-            table.players[player_key].bust = True
-            
+        
         #print(player_key)
 
     #apply blinds and deal cards
@@ -276,6 +275,12 @@ def play_hand_against_models(player_models):
         print(balance_string)
     #print(table.current_stage, " ", pre_flop_passed)
 
+    #apply busts
+
+    for player in table.players.values():
+        if player.total_money < 1:
+            player.bust = True
+
     print("\n\n****HAND OVER****\n\n")
 
 def play_hand_v2(player_models):
@@ -287,6 +292,8 @@ def play_hand_v2(player_models):
     table.apply_blind()
     table.update_pot()
     table.deal()
+
+    table.rotate_blinds()
     
     memory_buffers = [ReplayBuffer(500) for _ in range(len(table.players))]
     negative_memory_buffers = [ReplayBuffer(100) for _ in range(len(table.players))]
@@ -385,7 +392,7 @@ def play_hand_v2(player_models):
 
                     elif current_player.raised:
                         player_move_queue = table.get_active_players(current_player_key, starting_key_removal = True)
-
+                        
                         # ensure the current player isn't the last player in the hand
                         # if he's the last to move then  
                         if len(player_move_queue) > 1:
@@ -714,7 +721,7 @@ def train(num_players:int):
                 # resets player if they bust and adds a harsh punishment 
                 if player.total_money < 1 or player.bust:
                     print(f"Player {network_index} ran out of money")
-                    failures[key] += 1.0
+                    failures[key] += 2.0
                     player.total_money = base_money
                     player.bust = False
 
@@ -788,29 +795,33 @@ def train_from_files(num_models):
         raise ValueError(f"Expected {num_models} weight sets, found {len(weights)}")
 
     
-    num_episodes = 6000
+    num_episodes = 10000
     base_money = 5000
 
     player_networks = []
 
+    #clears out weights and num actions
     reward_weights.clear()
     average_number_of_actions.clear()
-    #sets reward weight vectors, clears
+    
     build_table(num_models)
     
-    
+    # assigns weights, num actions, and total money
     for index, player_key in enumerate(table.players.keys()):
 
         reward_weights[player_key] = weights[index]
         table.players[player_key].total_money = base_money
         average_number_of_actions.append(0)
 
+    #gets all stored networks
     player_networks = get_stored_networks(num_models)
-
+    
+    #generates a buffer of memories
     cumulative_memories = [ReplayBuffer(4000) for _ in range(num_models)]
 
     #episode loop
     for eps in range(num_episodes):
+        print("Episode: ", eps)
         if keyboard.is_pressed('p'):
             input("Paused. Press Enter to resume.")
         starting_money = {}
@@ -847,10 +858,16 @@ def train_from_files(num_models):
 
             #rapidly reduces money gained(to prevent lucky runs from giving too much) and gives a moderate reward for gaining money
             if player.total_money > base_money * 1.5:
-                player.total_money *= 0.7
-    for model_ind in range(len(player_networks)):
-        model_obj = player_networks[model_ind]
-        model_obj.store_models(f"./networks/model{model_ind}/")
+                player.total_money *= 0.75
+
+
+    confirmation = input("Are you sure you want to overwrite existing networks? (y/n)").strip().lower()
+    if "y" in confirmation:
+            
+        for model_ind in range(len(player_networks)):
+            
+            model_obj = player_networks[model_ind]
+            model_obj.store_models(f"./networks/model{model_ind}/")
 
 def play_against_models(total_num_models):
     global reward_weights
