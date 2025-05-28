@@ -219,6 +219,9 @@ def play_hand_against_models(player_models):
                         # if he's the last to move then  
                         if len(player_move_queue) > 1:
                             last_player = False
+                        else:
+                            if table.is_showdown():
+                                last_player = True
                         # move the starting player key to the last person that raised
                         # for the next betting round
                         starting_player_key = current_player_key
@@ -230,7 +233,7 @@ def play_hand_against_models(player_models):
                     if network_index != human_player_index:
                         #print("Illegal action: ", player_action)
                         player_action = player_models[network_index].forward(table_state, epsilon=1.0)
-                        if bad_action_count >= 20:
+                        if bad_action_count >= 50:
                             input("Debug: press enter to continue")
                     else:
                         player_action = get_player_action()
@@ -393,6 +396,11 @@ def play_hand_v2(player_models):
                         # if he's the last to move then  
                         if len(player_move_queue) > 1:
                             last_player = False
+                        else:
+                            # ends the betting round if the last player raised
+                            # and the last player is the only one that can make a vald action 
+                            if table.is_showdown():
+                                last_player = True
                         # move the starting player key to the last person that raised
                         # for the next betting round
                         starting_player_key = current_player_key
