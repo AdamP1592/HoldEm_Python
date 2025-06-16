@@ -1,4 +1,4 @@
-from Game import *
+from Driver import *
 from dqn.ReplayBuffer import ReplayBuffer
 from dqn.Memory import Memory
 def test_hand():
@@ -112,8 +112,6 @@ def print_comm_cards():
         else:
             print(card.get_true_name(), end = " ")
     print()
-
-
 
 def test_state():
     build_table(3)

@@ -12,12 +12,8 @@ Agents are trained over **generations** using freshly initialized Dueling Double
 
 - Python 3.11 (minimum)
 - TensorFlow 2.x
-<<<<<<< HEAD
 - NumPy 1.26.*
 - keyboard 0.13.5
-=======
-- NumPy
->>>>>>> origin/DuelingDoubleDeepQNet-HoldEm
 
 **Memory warning**: Full training consumes **2-4 GB RAM**. If using lower-spec hardware:
 - Reduce network width/depth
@@ -40,7 +36,7 @@ Agents are trained over **generations** using freshly initialized Dueling Double
 - Each network outputs **advantage and value** streams, combined into Q-values.
 - Uses:
   - **Huber Loss** for stability
-  - **Adam optimizer**
+  - **Adam optimizer** 
   - **Target networks**
   - **Epsilon-greedy exploration**
 
