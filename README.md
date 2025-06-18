@@ -132,6 +132,74 @@ This system was built under **hardware constraints** on a 6-year-old laptop with
 The framework can be scaled horizontally with more compute (parallel training, threading, larger buffers) or extended with more sophisticated learning heuristics.
 
 ---
+
+## Equations
+
+- Calculate the qs:
+  - Direct network outputs:
+
+    V(s) = state value as a whole independent from any action
+
+    A(s, a) = advantage of a specific action given the current state
+
+  - Calculated value:
+    Q(s, a) = Q-value(return of taking a specific action)
+
+  $$
+
+
+
+  Q(s, a) = V(s) + (A(s, a) - mean(A(s, a)))
+
+  $$
+
+- Select action:
+  - $a^*$ = the specific action taken
+
+  $$
+
+  a^* = argmax(Q(s, a))
+
+  $$
+
+
+- Target equation:
+  - $\gamma$ = discount
+  - $r$ = reward
+  - $y$ = target value
+  - $\theta$ denotes the main network
+  - $\theta^-$ denotes the target network
+  - $s'$ = the next state
+  - $done$ = 0 if there are more actions to take, 1 if the episode ended
+  - $a'$ denotes all possible actions
+   
+  $$
+
+    a^* = argmax(Q(s', a';\theta)) \\
+
+    Q_{target} = (Q(s', a*;\theta^-)) \\
+
+    y = r + \gamma(1 - done) \cdot Q_{target} \\
+
+  $$
+
+- Loss equation:
+
+  - $\delta$ = 1 by default
+
+  $$ 
+
+  \mathcal{L}(y, Q(s, a)) = 
+  \begin{cases}
+  \frac{1}{2} (y - Q(s,a))^2 &\text{if } |y - Q(s, a)| < \delta \\
+
+  \delta |y-Q(s, a)| - 1/2 &\text{if } |y - Q(s, a)| \geq \delta \\
+  \end{cases}
+
+  $$
+
+---
+
 ## Original Design
 
 The original system was designed as a **multi-population evolutionary framework** inspired by biological specialization and global competition. While **hardware constraints** required simplification, the conceptual structure remains central to the project's foundations.
