@@ -185,12 +185,7 @@ $$
   - $\delta$ = 1 by default
 
 $$ 
-\mathcal{L}(y, Q(s, a)) = 
-\begin{cases}
-\frac{1}{2} (y - Q(s,a))^2 &\text{if } |y - Q(s, a)| < \delta \\
-
-\delta |y-Q(s, a)| - 1/2 &\text{if } |y - Q(s, a)| \geq \delta \\
-\end{cases}
+\mathcal{L}(y, Q(s, a)) = \begin{cases} \frac{1}{2} (y - Q(s,a))^2 &\text{if } |y - Q(s, a)| < \delta \\ \delta |y-Q(s, a)| - 1/2 &\text{if } |y - Q(s, a)| \geq \delta \\ \end{cases}
 $$
 
 ---
