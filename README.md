@@ -146,20 +146,14 @@ The framework can be scaled horizontally with more compute (parallel training, t
     Q(s, a) = Q-value(return of taking a specific action)
 
   $$
-
-
-
   Q(s, a) = V(s) + (A(s, a) - mean(A(s, a)))
-
   $$
 
 - Select action:
   - $a^*$ = the specific action taken
 
   $$
-
   a^* = argmax(Q(s, a))
-
   $$
 
 
@@ -174,13 +168,11 @@ The framework can be scaled horizontally with more compute (parallel training, t
   - $a'$ denotes all possible actions
    
   $$
-
     a^* = argmax(Q(s', a';\theta)) \\
 
     Q_{target} = (Q(s', a*;\theta^-)) \\
 
     y = r + \gamma(1 - done) \cdot Q_{target} \\
-
   $$
 
 - Loss equation:
@@ -188,14 +180,12 @@ The framework can be scaled horizontally with more compute (parallel training, t
   - $\delta$ = 1 by default
 
   $$ 
-
   \mathcal{L}(y, Q(s, a)) = 
   \begin{cases}
   \frac{1}{2} (y - Q(s,a))^2 &\text{if } |y - Q(s, a)| < \delta \\
 
   \delta |y-Q(s, a)| - 1/2 &\text{if } |y - Q(s, a)| \geq \delta \\
   \end{cases}
-
   $$
 
 ---
