@@ -169,9 +169,7 @@ $$
    
 $$
 a^* = argmax(Q(s', a';\theta)) \\
-
 Q_{target} = (Q(s', a*;\theta^-)) \\
-
 y = r + \gamma(1 - done) \cdot Q_{target} \\
 $$
 
